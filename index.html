@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Chatouille">
+<title>WWM-Piano</title>
+<link rel="icon" type="image/png" href="img/favicon.png"/>
+<!--
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous"/>
+-->
+<!-- local resources make the app work locally without connection -->
+<link rel="stylesheet" href="css/libs.css" referrerpolicy="no-referrer"/>
+
+<!-- FontAwesome is more complex -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer"/>
+
+<link rel="stylesheet" href="css/app.css" referrerpolicy="no-referrer"/>
+
+<body>
+
+<div class="topbar flexrow">
+	<div class="title">
+		<img src="img/favicon.png" class="mr-1"/>
+		<span>WWM-Piano</span>
+	</div>
+	<div class="ml-4 fakefield flexrow"><i class="fa fa-volume-high"></i><span class="ml-2 mr-1 volume">50</span>%</div>
+	<div class="flex-grow-1"></div>
+	<a href="https://github.com/ChatouilleGG/wwm-piano" target="_blank" style="color:#09f;display:flex;text-decoration:none"><img src="https://github.githubassets.com/favicons/favicon-dark.png" style="height:1.4em;filter:brightness(0.5)sepia(1)saturate(50)hue-rotate(190deg)"/>&nbsp;github</a>
+</div>
+<div class="inner">
+	<div class="background"></div>
+	<img class="wwm-logo" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="/>
+	<div class="bg-credit"></div>
+
+	<div style="flex-grow:3"></div>
+
+	<div class="piano">
+		<div class="row">
+			<button class="key" data-audio="25" data-bind="regul-KeyQ">1<b>Q</b></button>
+			<button class="key" data-audio="26" data-bind="upper-KeyQ"><i>#</i>1<b>Q</b></button>
+			<button class="key" data-audio="27" data-bind="regul-KeyW">2<b>W</b></button>
+			<button class="key" data-audio="28" data-bind="lower-KeyE"><i>b</i>3<b>E</b></button>
+			<button class="key" data-audio="29" data-bind="regul-KeyE">3<b>E</b></button>
+			<button class="key" data-audio="30" data-bind="regul-KeyR">4<b>R</b></button>
+			<button class="key" data-audio="31" data-bind="upper-KeyR"><i>#</i>4<b>R</b></button>
+			<button class="key" data-audio="32" data-bind="regul-KeyT">5<b>T</b></button>
+			<button class="key" data-audio="33" data-bind="upper-KeyT"><i>#</i>5<b>T</b></button>
+			<button class="key" data-audio="34" data-bind="regul-KeyY">6<b>Y</b></button>
+			<button class="key" data-audio="35" data-bind="lower-KeyU"><i>b</i>7<b>U</b></button>
+			<button class="key" data-audio="36" data-bind="regul-KeyU">7<b>U</b></button>
+		</div>
+		<div class="row">
+			<button class="key" data-audio="13" data-bind="regul-KeyA">1<b>A</b></button>
+			<button class="key" data-audio="14" data-bind="upper-KeyA"><i>#</i>1<b>A</b></button>
+			<button class="key" data-audio="15" data-bind="regul-KeyS">2<b>S</b></button>
+			<button class="key" data-audio="16" data-bind="lower-KeyD"><i>b</i>3<b>D</b></button>
+			<button class="key" data-audio="17" data-bind="regul-KeyD">3<b>D</b></button>
+			<button class="key" data-audio="18" data-bind="regul-KeyF">4<b>F</b></button>
+			<button class="key" data-audio="19" data-bind="upper-KeyF"><i>#</i>4<b>F</b></button>
+			<button class="key" data-audio="20" data-bind="regul-KeyG">5<b>G</b></button>
+			<button class="key" data-audio="21" data-bind="upper-KeyG"><i>#</i>5<b>G</b></button>
+			<button class="key" data-audio="22" data-bind="regul-KeyH">6<b>H</b></button>
+			<button class="key" data-audio="23" data-bind="lower-KeyJ"><i>b</i>7<b>J</b></button>
+			<button class="key" data-audio="24" data-bind="regul-KeyJ">7<b>J</b></button>
+		</div>
+		<div class="row">
+			<button class="key" data-audio="01" data-bind="regul-KeyZ">1<b>Z</b></button>
+			<button class="key" data-audio="02" data-bind="upper-KeyZ"><i>#</i>1<b>Z</b></button>
+			<button class="key" data-audio="03" data-bind="regul-KeyX">2<b>X</b></button>
+			<button class="key" data-audio="04" data-bind="lower-KeyC"><i>b</i>3<b>C</b></button>
+			<button class="key" data-audio="05" data-bind="regul-KeyC">3<b>C</b></button>
+			<button class="key" data-audio="06" data-bind="regul-KeyV">4<b>V</b></button>
+			<button class="key" data-audio="07" data-bind="upper-KeyV"><i>#</i>4<b>V</b></button>
+			<button class="key" data-audio="08" data-bind="regul-KeyB">5<b>B</b></button>
+			<button class="key" data-audio="09" data-bind="upper-KeyB"><i>#</i>5<b>B</b></button>
+			<button class="key" data-audio="10" data-bind="regul-KeyN">6<b>N</b></button>
+			<button class="key" data-audio="11" data-bind="lower-KeyM"><i>b</i>7<b>M</b></button>
+			<button class="key" data-audio="12" data-bind="regul-KeyM">7<b>M</b></button>
+		</div>
+	</div>
+
+	<div class="flex-grow-1"></div>
+
+</div>
+
+<!--
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.5.2/bootbox.min.js" integrity="sha512-RdSPYh1WA6BF0RhpisYJVYkOyTzK4HwofJ3Q7ivt/jkpW6Vc8AurL1R+4AUcvn9IwEKAPm/fk7qFZW3OuiUDeg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+-->
+<!-- local resources make the app work locally without connection -->
+<script src="js/libs.js" referrerpolicy="no-referrer"></script>
+<script src="js/app.js" referrerpolicy="no-referrer"></script>
+</body>
+</html>

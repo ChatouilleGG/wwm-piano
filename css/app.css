@@ -1,0 +1,179 @@
+
+body {
+	width: 100vw;
+	height: 100vh;
+	font-size: 12pt;
+	display: flex;
+	flex-direction: column;
+	color: #fff;
+	overflow: hidden;
+}
+
+.topbar {
+	border-bottom: 1px solid #445;
+	padding: 0 1em;
+	> * { padding: 0.5rem 0; }
+
+	background: #223;
+
+	.title {
+		padding-right: 1em;
+		border-right: 1px solid #445;
+		display: flex;
+		align-items: center;
+		font-size: 140%;
+		img { height: 2em; }
+	}
+}
+
+.inner {
+	flex-grow: 1;
+	box-shadow: inset 0 0 4px -1px black;
+	background: #678;
+	color: #fff;
+	display: flex;
+	flex-direction: column;
+
+	position: relative;
+	.background {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		/*background-image: url("../img/bg1.avif");*/
+		background-size: cover;
+		background-position: center;
+		opacity: 1.0;
+	}
+
+	.wwm-logo {
+		position: absolute;
+		left: 3em;
+		top: 3em;
+		width: auto;
+		height: auto;
+	}
+
+	.bg-credit {
+		position: absolute;
+		right: 0.5em;
+		bottom: 0.5em;
+		opacity: 0.8;
+	}
+}
+
+.piano {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+
+	.row {
+		display: flex;
+		flex-direction: row;
+		align-items: stretch;
+		justify-content: center;
+
+		position: relative;
+		&:before {
+			content: "";
+			position: absolute;
+			left: 0;
+			width: 100%;
+			align-self: center;
+			height: 2px;
+			background: #fff6;
+			box-shadow: 0 0 3.3em 0.5em #fff;
+		}
+
+		.key {
+			flex-shrink: 0;
+/*
+			background: transparent;
+			border: 0px solid currentColor;
+			box-shadow: 0 0 5px 2px currentColor, inset 0 0 3px 0px currentColor;
+*/
+			background: #0003;
+			border: none;
+			/*backdrop-filter: blur(2px);*/
+
+			width: 3.3em;
+			height: 3.3em;
+			border-radius: 100%;
+			font-size: 200%;
+			font-weight: lighter;
+			font-style: italic;
+			color: #fff;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			margin: 0.6em 0.8em;
+			outline: none;
+			transition: 400ms;
+			&.trigger {
+				color: #0f0;
+				box-shadow: 0 0 20px 8px currentColor, inset 0 0 50px 0px currentColor;
+				transition: 0ms;
+			}
+
+			i {
+				font-style: normal;
+				font-size: 50%;
+				margin: -1.7em 0.3em 0 -0.8em;
+			}
+
+			position: relative;
+			b {
+				position: absolute;
+				bottom: -0.5em;
+				text-align: center;
+				font-size: 65%;
+				font-weight: normal;
+				font-style: normal;
+				background: #aaa;
+				color: #000;
+				width: 1.2em;
+				height: 1.2em;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+		}
+	}
+}
+
+.fakefield {
+	padding: 0.1rem 0.5rem;
+	border: 1px solid #fff3;
+	border-radius: 0.2rem;
+	font-size: 0.9rem;
+}
+
+label { margin: 0; }
+
+.modal { color: #212529; }
+.bootbox-body { color: black; }
+.bootbox-title {
+	font-size: 120%;
+	margin-bottom: 0.5em;
+}
+
+.flexrow {
+	display: flex;
+	align-items: center;
+	&.spaced { justify-content: space-between; }
+}
+.flexcol {
+	display: flex;
+	flex-direction: column;
+}
+.flex50 {
+	display: flex;
+	align-items: center;
+	> * { width: 100%; }
+}
+
+.dropdown-item:disabled {
+	opacity: 0.3;
+	pointer-events: none;
+}

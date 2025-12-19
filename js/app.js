@@ -1,6 +1,6 @@
 
-//@TODO: find a way to merge all sounds into a single-file sound bank and use that instead.
 //@TODO: option to disable background
+//@TODO: handle more screen sizes
 
 let kbBindings = {};
 let modifier = "regul";	// regul | lower | upper
@@ -16,14 +16,75 @@ let backgrounds = [
 ];
 
 $(document).ready(() => {
+
+	// NOTE: We cannot load custom binary in local mode, so we still need individual sound files to fallback to.
+	if (window.location.href.startsWith('file://')) {
+
+		// Load individual sound files
+		$('.key').each((i,elem) => {
+			let audioKey = $(elem).data('audio');
+			audioMap[audioKey] = new Audio(resolveAudioUri(audioKey));
+		});
+
+	}
+	else {
+
+		// Load sounds package
+		const req = new XMLHttpRequest();
+		req.open("GET", 'audio/pack01', true);
+		req.responseType = 'arraybuffer';
+		req.onload = (event) => {
+			if (req.response) {
+				let buf = buffer.Buffer.from(req.response);
+
+				buf.myOffset = 0;
+				buf.readUInt32 = function() {
+					this.myOffset += 4;
+					return this.readUInt32LE(this.myOffset-4);
+				}
+				buf.readShortString = function() {
+					let len = this.readUInt8(this.myOffset);
+					this.myOffset += 1+len;
+					return (len > 0) ? this.toString('utf8', this.myOffset-len, this.myOffset) : "";
+				}
+				buf.readArrayBuffer = function() {
+					let size = this.readUInt32();
+					this.myOffset += size;
+					return this.buffer.slice(this.myOffset-size, this.myOffset);
+				}
+
+				// 1. number of sounds
+				let numSounds = buf.readUInt32();
+				console.log("numSounds", numSounds);
+
+				// 2. for each element
+				for (let i=0; i<numSounds; i++) {
+					// 2.1. sound name
+					let name = buf.readShortString();
+					console.log("fileName", name);
+
+					// 2.2. audio data (as arraybuffer)
+					let data = buf.readArrayBuffer();
+					console.log("data", data);
+
+					// Create blob with a local URL (alternatively could use data-url, not sure what is best)
+					let blob = new Blob([data], {type:'audio/mp3'});
+					let url = URL.createObjectURL(blob);
+
+					// Bind it
+					audioMap[name] = new Audio(url);
+				}
+			}
+		};
+		req.send(null);
+
+	}
+
 	$('.piano').on('mousedown', '.key', triggerKey);
 
 	$('.key').each((i,elem) => {
 		let bind = $(elem).data('bind');
 		kbBindings[bind] = elem;
-
-		let audioKey = $(elem).data('audio');
-		audioMap[audioKey] = new Audio(resolveAudioUri(audioKey));
 	});
 
 	$('body').on('keydown keyup', (event) => {

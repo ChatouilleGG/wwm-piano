@@ -1,6 +1,5 @@
 
 //@TODO: option to disable background
-//@TODO: handle more screen sizes
 
 let kbBindings = {};
 let modifier = "regul";	// regul | lower | upper

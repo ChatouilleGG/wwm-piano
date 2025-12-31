@@ -12,6 +12,8 @@ let backgrounds = [
 	{ url:"img/bg1.avif", logo:"dark", blur:true },
 	{ url:"img/bg2.avif", logo:"dark", blur:true },
 	{ url:"img/bg3.avif", logo:"light", credit:"https://steamcommunity.com/sharedfiles/filedetails/?id=3403239559" },
+	{ url:"img/bg4.avif", logo:"dark", blur:true },
+	{ url:"img/bg5.avif", logo:"dark", blur:true },
 ];
 
 $(document).ready(() => {

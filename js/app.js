@@ -1,5 +1,5 @@
 
-//@TODO: option to disable background
+//@TODO: save options to local storage (volume, background)
 
 let kbBindings = {};
 let modifier = "regul";	// regul | lower | upper
@@ -119,15 +119,7 @@ $(document).ready(() => {
 		$('.volume').text(Math.round(volume*100));
 	});
 
-	{
-		let bg = backgrounds[Math.floor(backgrounds.length*Math.random())];
-		$('.background').css('background-image', 'url('+bg.url+')');
-		$('.wwm-logo').attr('src', 'img/wwm-'+bg.logo+'.webp');
-		if (bg.blur)
-			$('.key').css('backdrop-filter', 'blur(2px)');
-		if (bg.credit)
-			$('.bg-credit').html('<a href="'+bg.credit+'" target="_blank"><i class="fa fa-link mr-1"></i>background</a>');
-	}
+	toggleBackground($('.cb-bg')[0].checked);
 
 });
 
@@ -159,4 +151,23 @@ function triggerKey() {
 	this.hlTimeout = setTimeout(() => {
 		$(this).removeClass('trigger');
 	}, 30);
+}
+
+function toggleBackground(enable) {
+	$('.key').css('backdrop-filter', '');
+	$('.bg-credit').empty();
+
+	if (enable) {
+		let bg = backgrounds[Math.floor(backgrounds.length*Math.random())];
+		$('.background').css('background-image', 'url('+bg.url+')');
+		$('.wwm-logo').attr('src', 'img/wwm-'+bg.logo+'.webp');
+		if (bg.blur)
+			$('.key').css('backdrop-filter', 'blur(2px)');
+		if (bg.credit)
+			$('.bg-credit').html('<a href="'+bg.credit+'" target="_blank"><i class="fa fa-link mr-1"></i>background</a>');
+	}
+	else {
+		$('.background').css('background-image', '');
+		//$('.wwm-logo').attr('src', 'img/wwm-light.webp');
+	}
 }

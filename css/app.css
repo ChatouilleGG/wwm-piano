@@ -10,6 +10,7 @@ body {
 }
 
 .topbar {
+	z-index: 200;
 	border-bottom: 1px solid #445;
 	padding: 0 1em;
 	> * { padding: 0.5rem 0; }
@@ -63,18 +64,78 @@ body {
 	}
 }
 
-.piano {
-	font-size: 0.74vw;	/*responsiveness*/
+.top-section {
+	flex-grow: 3;
+	display: flex;
+	justify-content: center;
+}
 
+body:not(.gaming) .gaming { display: none!important; }
+
+.gamesheet {
+	display: grid;
+
+	grid-template-rows: 1fr 0fr;
+
+	.range {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1fr;
+	}
+
+	.col {
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		position: relative;
+
+		&:before {
+			content: "";
+			position: absolute;
+			top: 0;
+			height: 100%;
+			width: 0.1px;
+			box-shadow: 0 0 1.6em 0.15em #000;
+			opacity: 0.75;
+		}
+	}
+
+	.bottom {
+		width: 100vw;
+		border: 1px solid #ff0;
+		box-shadow: 0 0 2em 0.1em #ff0;
+		z-index: 1;
+	}
+
+	position: relative;
+	canvas {
+		position: absolute;
+		width: 100%;
+		height: 100%;
+	}
+
+	overflow: hidden;
+}
+
+/* common class to align sheet with piano */
+.pianorow {
+	font-size: 0.74vw;	/*responsiveness*/
+	display: grid;
+	grid-template-columns: repeat(12, 6.6em);
+	grid-gap: 3.2em;
+	justify-content: center;
+}
+
+.piano {
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
+	padding: 2em 0 1.6em 0;
 
-	.row {
-		display: flex;
-		flex-direction: row;
-		align-items: stretch;
-		justify-content: center;
+	.pianorow {
+		grid-template-rows: 6.6em;
+
+		+.pianorow { margin-top: 2.4em; }
 
 		position: relative;
 		&:before {
@@ -98,9 +159,6 @@ body {
 			background: #0003;
 			border: none;
 			/*backdrop-filter: blur(2px);*/
-
-			width: 3.3em;
-			height: 3.3em;
 			border-radius: 100%;
 			font-size: 200%;
 			font-weight: lighter;
@@ -109,7 +167,6 @@ body {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			margin: 0.6em 0.8em;
 			outline: none;
 			transition: 400ms;
 			&.trigger {
@@ -139,8 +196,188 @@ body {
 				display: flex;
 				align-items: center;
 				justify-content: center;
+				pointer-events: none;
+			}
+
+			.ring-ext, .ring-int, .flash {
+				position: absolute;
+				width: 100%;
+				height: 100%;
+				pointer-events: none;
+				border-radius: 100%;
+			}
+	
+			.ring-ext {
+				border: 1px solid #ff0;
+				
+				box-sizing: content-box;
+				padding: 1rem;
+				animation: 1s linear 0s 1 normal forwards running ring-ext;
+				/* animation-duration set programmatically */
+			}
+
+			.ring-int {
+				width: 0;
+				height: 0;
+				border: 1px solid #ff0;
+				border-radius: 100%;
+				animation: 1s linear 0s 1 normal forwards running ring-int;
+				/* animation-duration set programmatically */
+			}
+
+			.flash {
+				animation: 300ms ease-out 0s 1 normal forwards running flash;
 			}
 		}
+	}
+}
+
+@keyframes ring-ext {
+	0% { padding: 1.2rem; opacity: 0; }
+	10% { opacity: 1; }
+	80% { padding: 0; opacity: 1; }
+	100% { padding: 0; opacity: 0;  }
+}
+@keyframes ring-int {
+	0% { width: 0; height: 0; opacity: 0; }
+	30% { opacity: 1; }
+	80% { width: 100%; height: 100%; opacity: 1; }
+	100% { width: 100%; height: 100%; opacity: 0;  }
+}
+@keyframes flash {
+	0% { opacity: 1; box-shadow: inset 0 0 32px 16px #ff0; }
+	20% { opacity: 1; }
+	100% { opacity: 0; box-shadow: inset 0 0 0px 0px #ff0; }
+}
+
+.bottom-section {
+	flex-grow: 1;
+	body.gaming & { flex-grow: 0; }
+	
+	align-self: center;
+	padding-bottom: 1em;
+}
+
+.gametrack {
+	display: flex;
+	width: 90vw;
+	padding: 0.6em 0.4em 0.45em 0.4em;	/* clickable area */
+	cursor: pointer;
+
+	.bar {
+		width: 100%;
+		height: 4px;
+		background: #0003;
+		border-radius: 2em;
+
+		flex-direction: row;
+		align-items: center;
+		.cursor {
+			height: 100%;
+			width: 50%;
+			background: #0ff8;
+			border-radius: 2em;
+			display: flex;
+			align-items: center;
+			position: relative;
+			&:after {
+				content: "";
+				position: absolute;
+				right: -7px;
+				width: 14px;
+				height: 14px;
+				background: #0ff;
+				border-radius: 2em;
+			}
+		}
+	}
+}
+
+.controls {
+	position: absolute;
+	right: 0;
+	top: 4em;
+	padding: 0.75em 0.5em;
+	color: #0ffc;
+	border: 1px solid currentColor;
+	background: #0001;
+	border-radius: 0.4em 0 0 0.4em;
+	display: grid;
+	grid-gap: 0.75em;
+
+	.btn {
+		color: inherit;
+		background-color: #fff0;
+		border: 1px solid currentColor;
+		&:hover { background-color: #fff2; }
+	}
+
+	button i { width: 1rem; }
+	.fa-file-audio { font-size: 1.2rem; }
+}
+
+.gamesettings {
+	position: absolute;
+	width: 24em;
+	right: -24em;
+	height: 100%;
+	padding: 1em;
+	background-color: #223;
+	border-left: 1px solid #445;
+	z-index: 100;
+	transition: 300ms;
+	&.visible {
+		right: 0;
+		box-shadow: 0 0 6px -1px black;
+	}
+
+	outline: none;
+
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+
+	color: #8cf;
+
+	button { color: inherit; }
+	input[type="file"] {
+		&::file-selector-button {
+			width: 100%;
+			background-color: transparent;
+			color: #8cf;
+			border: 1px solid currentColor;
+			border-radius: 4px;
+			cursor: pointer;
+			transition: 200ms;
+		}
+		&:hover::file-selector-button { background-color: #fff2; }
+	}
+
+	textarea {
+		resize: none;
+		font-size: 10pt;
+		font-family: monospace;
+		line-height: 1.1;
+		height: 10em;
+	}
+
+	label.inline-setting {
+		display: flex;
+		align-items: center;
+
+		>span { width: 8em; }
+		>span+input, >span+select {
+			color: inherit;
+			background: transparent;
+			border: 1px solid currentColor;
+			border-radius: 4px;
+			padding: 0.1em 0.3em;
+		}
+		>input+span {
+			margin-left: 0.5em;
+			width: auto;
+		}
+
 	}
 }
 
@@ -178,4 +415,21 @@ label { margin: 0; }
 .dropdown-item:disabled {
 	opacity: 0.3;
 	pointer-events: none;
+}
+
+.dropanywhere {
+	display: none;
+	body.dropok & { display: flex; }
+	position: fixed;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	justify-content: center;
+	text-align: center;
+	align-items: center;
+	font-size: 6vw;
+	background: #0008;
+	color: #0f0;
+	font-weight: 600;
 }

@@ -18,7 +18,7 @@
 
 <link rel="stylesheet" href="css/app.css" referrerpolicy="no-referrer"/>
 
-<body>
+<body class="gaming">
 
 <div class="topbar flexrow">
 	<div class="title">
@@ -26,19 +26,29 @@
 		<span>WWM-Piano</span>
 	</div>
 	<div class="ml-4 fakefield flexrow"><i class="fa fa-volume-high"></i><span class="ml-2 mr-1 volume">50</span>%</div>
-	<label class="ml-4 fakefield flexrow"><input type="checkbox" class="cb-bg mr-1" onchange="toggleBackground(this.checked)" checked/>Background</label>
+	<!--<label class="ml-4 fakefield flexrow"><input type="checkbox" class="cb-bg mr-1" onchange="toggleBackground(this.checked)" checked/>Background</label>-->
 	<div class="flex-grow-1"></div>
 	<a href="https://github.com/ChatouilleGG/wwm-piano" target="_blank" style="color:#09f;display:flex;text-decoration:none"><img src="https://github.githubassets.com/favicons/favicon-dark.png" style="height:1.4em;filter:brightness(0.5)sepia(1)saturate(50)hue-rotate(190deg)"/>&nbsp;github</a>
 </div>
 <div class="inner">
+	<!--
 	<div class="background"></div>
 	<img class="wwm-logo" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="/>
 	<div class="bg-credit"></div>
+	-->
 
-	<div style="flex-grow:3"></div>
+	<div class="top-section">
+		<div class="gamesheet gaming">
+			<div class="pianorow">
+				<!-- generated -->
+			</div>
+			<div class="bottom"></div>
+			<canvas></canvas>
+		</div>
+	</div>
 
 	<div class="piano">
-		<div class="row">
+		<div class="pianorow">
 			<button class="key" data-audio="25" data-bind="regul-KeyQ">1<b>Q</b></button>
 			<button class="key" data-audio="26" data-bind="upper-KeyQ"><i>#</i>1<b>Q</b></button>
 			<button class="key" data-audio="27" data-bind="regul-KeyW">2<b>W</b></button>
@@ -52,7 +62,7 @@
 			<button class="key" data-audio="35" data-bind="lower-KeyU"><i>b</i>7<b>U</b></button>
 			<button class="key" data-audio="36" data-bind="regul-KeyU">7<b>U</b></button>
 		</div>
-		<div class="row">
+		<div class="pianorow">
 			<button class="key" data-audio="13" data-bind="regul-KeyA">1<b>A</b></button>
 			<button class="key" data-audio="14" data-bind="upper-KeyA"><i>#</i>1<b>A</b></button>
 			<button class="key" data-audio="15" data-bind="regul-KeyS">2<b>S</b></button>
@@ -66,7 +76,7 @@
 			<button class="key" data-audio="23" data-bind="lower-KeyJ"><i>b</i>7<b>J</b></button>
 			<button class="key" data-audio="24" data-bind="regul-KeyJ">7<b>J</b></button>
 		</div>
-		<div class="row">
+		<div class="pianorow">
 			<button class="key" data-audio="01" data-bind="regul-KeyZ">1<b>Z</b></button>
 			<button class="key" data-audio="02" data-bind="upper-KeyZ"><i>#</i>1<b>Z</b></button>
 			<button class="key" data-audio="03" data-bind="regul-KeyX">2<b>X</b></button>
@@ -82,8 +92,64 @@
 		</div>
 	</div>
 
-	<div class="flex-grow-1"></div>
+	<div class="bottom-section">
+		<div class="gametrack gaming">
+			<div class="bar">
+				<div class="cursor"></div>
+			</div>
+		</div>
+	</div>
 
+	<div class="controls">
+		<button type="button" class="btn" onclick="openSettings()"><i class="fa fa-file-audio"></i></button>
+		<button type="button" class="btn gaming" onclick="gameState.togglePlay()"><i class="fa fa-play"></i></button>
+		<button type="button" class="btn gaming" onclick="gameState.playFromStart()"><i class="fa fa-arrow-rotate-right"></i></button>
+	</div>
+
+	<div class="gamesettings" tabindex="0">
+		<button type="button" class="btn btn-link align-self-end" onclick="closeSettings()">
+			<i class="fa fa-arrow-right"></i>
+		</button>
+
+		<input type="file"/>
+
+		<textarea class="mt-2 form-control" placeholder="Or edit/paste text directly…"></textarea>
+
+		<label class="mt-2 inline-setting">
+			<span>Sheet Length</span>
+			<input type="number" min="500" max="10000" step="500" class="sheetVisibleLength" onchange="gameSettings.setSheetVisibleLength(this.value)"/>
+			<span>ms</span>
+		</label>
+
+		<label class="mt-2 inline-setting">
+			<span>Speed</span>
+			<input type="number" min="10" max="800" step="10" class="speed" onchange="gameSettings.setSpeed(this.value/100)"/>
+			<span>%</span>
+		</label>
+
+		<label class="mt-2 inline-setting">
+			<span>Horizontal Shift</span>
+			<input type="number" min="-24" max="24" step="1" class="shift" onchange="gameSettings.setShift(this.value)"/>
+		</label>
+
+		<label class="mt-2 inline-setting">
+			<span>Note Hint Style</span>
+			<select class="noteHintStyle" onchange="gameSettings.setNoteHintStyle(this.value)">
+				<option value="">None</option>
+				<option value="ring-ext">Ring external</option>
+				<option value="ring-int">Ring internal</option>
+				<option value="flash">Single flash</option>
+			</select>
+		</label>
+
+		<label class="mt-2 inline-setting">
+			<span>Hint Duration</span>
+			<input type="number" min="100" max="2000" step="100" class="noteHintDuration" onchange="gameSettings.setNoteHintDuration(this.value)"/>
+			<span>ms</span>
+		</label>
+	</div>
+
+	<div class="dropanywhere">DROP<br>ANYWHERE</div>
 </div>
 
 <!--

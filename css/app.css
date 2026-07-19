@@ -379,6 +379,12 @@ body:not(.gaming) .gaming { display: none!important; }
 		}
 
 	}
+
+	input[type="checkbox"] {
+		width: 1.1em;
+		height: 1.1em;
+		margin: 0;
+	}
 }
 
 .fakefield {

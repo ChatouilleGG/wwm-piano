@@ -187,6 +187,7 @@ function toggleBackground(enable) {
 //@DONE: [FEATURE] configurable shift
 //@DONE: [SETTINGS] configurable incoming note hint style (eg. outside circle, inside circle, flash)
 //@DONE: [SETTINGS] configurable incoming note hint delay (how long it appears before it needs to be hit)
+//@DONE: [FEATURE] autoplay option to preview music
 
 //@TODO: [FEATURE] support notes colorization in file format
 //@TODO: [QOL] auto save settings
@@ -385,9 +386,10 @@ class GameSheet extends Array {
 		for (let currentSecond=0; currentSecond<=this.lastTs/1000; currentSecond++) {
 			while (this[nextIndex].ts/1000 < currentSecond)
 				nextIndex++;
-			this.timeTable[currentSecond] = nextIndex;	
+			this.timeTable[currentSecond] = nextIndex;
 		}
 
+		$('body').toggleClassHelper(this.length > 0, 'gaming', '');
 		$('.controls').toggleClassHelper(this.length > 0, 'fa-cog', 'fa-file-audio', true);
 	}
 }
@@ -412,6 +414,9 @@ class GameSettings {
 
 		this.setNoteHintStyle('ring-ext');
 		this.setNoteHintDuration(1000);
+
+		// Automatically play notes (preview music)
+		this.setAutoPlay(false);
 	}
 
 	setSheetVisibleLength(val) {
@@ -443,6 +448,11 @@ class GameSettings {
 	setNoteHintDuration(val) {
 		this.noteHintDuration = clamp(val, 100, 2000);
 		$('.noteHintDuration').val(this.noteHintDuration);
+	}
+
+	setAutoPlay(val) {
+		this.autoPlay = val;
+		$('.gamesettings .autoPlay')[0].checked = this.autoPlay;
 	}
 }
 
@@ -504,6 +514,8 @@ class GameState {
 			// cannot get them proper while paused/seeking
 			// so we detect and play them here instead of within seek()
 			this.renderNoteHints(this.ts-dt, this.ts);
+
+			this.handleAutoPlay(this.ts-dt, this.ts);
 		}
 
 		if (this.ts >= gameSheet.lastTs) {
@@ -580,6 +592,20 @@ class GameState {
 			}
 		}
 	}
+
+	handleAutoPlay(previousTs, currentTs) {
+		if (!gameSettings.autoPlay)
+			return;
+
+		const timeIndex = Math.floor(previousTs/1000);
+		for (let i=gameSheet.timeTable[timeIndex]; i<gameSheet.length; i++) {
+			const note = gameSheet[i];
+			if (note.ts > currentTs)
+				break;
+			if (note.ts > previousTs)
+				triggerKey.call($('[data-audio="'+("0"+note.code).slice(-2)+'"]')[0]);
+		}
+	}
 }
 
 // Array of array of elements, first row is always the next one being deleted, process once per second
@@ -611,9 +637,9 @@ function clamp(val,min,max) {
 	return Math.min(Math.max(val,min),max);
 }
 
-$.fn.toggleClassHelper = function(b, iconTrue, iconFalse, bFindInChildren) {
-	let elem = bFindInChildren ? this.find('.'+(b?iconFalse:iconTrue)) : this;
-	elem.removeClass(b?iconFalse:iconTrue).addClass(b?iconTrue:iconFalse);
+$.fn.toggleClassHelper = function(b, classTrue, classFalse, bFindInChildren) {
+	let elem = bFindInChildren ? this.find('.'+(b?classFalse:classTrue)) : this;
+	elem.removeClass(b?classFalse:classTrue).addClass(b?classTrue:classFalse);
 	return this;
 }
 

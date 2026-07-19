@@ -18,7 +18,7 @@
 
 <link rel="stylesheet" href="css/app.css" referrerpolicy="no-referrer"/>
 
-<body class="">
+<body>
 
 <div class="topbar flexrow">
 	<div class="title">
@@ -146,6 +146,11 @@
 			<span>Hint Duration</span>
 			<input type="number" min="100" max="2000" step="100" class="noteHintDuration" onchange="gameSettings.setNoteHintDuration(this.value)"/>
 			<span>ms</span>
+		</label>
+
+		<label class="mt-2 inline-setting">
+			<span>Auto Play Notes</span>
+			<input type="checkbox" class="autoPlay" onchange="gameSettings.setAutoPlay(this.checked)"/>
 		</label>
 	</div>
 

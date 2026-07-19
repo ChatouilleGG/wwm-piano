@@ -335,9 +335,9 @@ class Note {
 	}
 
 	setCode(code) {
-		this.code = code;
+		this.code = code + gameSettings.shift;
 
-		if (code < 0 || code > 36)	// Notes become 0 when shifted away from range - discard them
+		if (this.code < 0 || this.code > 36)	// Notes become 0 when shifted away from range - discard them
 			this.code = 0;
 
 		//this.column = (code-1) % 12;
@@ -435,7 +435,7 @@ class GameSettings {
 		$('.gamesettings .shift').val(this.shift);
 		if (gameSheet) {
 			for (let note of gameSheet)
-				note.setCode(note.originalCode + this.shift);
+				note.setCode(note.originalCode);	// shift applied inside
 			gameState.renderSheet();
 		}
 	}
@@ -602,7 +602,7 @@ class GameState {
 			const note = gameSheet[i];
 			if (note.ts > currentTs)
 				break;
-			if (note.ts > previousTs)
+			if (note.ts > previousTs && note.code)
 				triggerKey.call($('[data-audio="'+("0"+note.code).slice(-2)+'"]')[0]);
 		}
 	}

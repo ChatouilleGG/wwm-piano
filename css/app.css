@@ -206,24 +206,27 @@ body:not(.gaming) .gaming { display: none!important; }
 				height: 100%;
 				pointer-events: none;
 				border-radius: 100%;
+				color: white;	/* set by code */
 			}
 	
 			.ring-ext {
-				border: 1px solid #ff0;
+				border: 1px solid currentColor;
+				box-shadow: 0 0 4px -1px currentColor, inset 0 0 4px -1px currentColor;
 				
 				box-sizing: content-box;
 				padding: 1rem;
 				animation: 1s linear 0s 1 normal forwards running ring-ext;
-				/* animation-duration set programmatically */
+				/* animation-duration set by code */
 			}
 
 			.ring-int {
 				width: 0;
 				height: 0;
-				border: 1px solid #ff0;
+				border: 1px solid currentColor;
+				box-shadow: 0 0 4px -1px currentColor, inset 0 0 4px -1px currentColor;
 				border-radius: 100%;
 				animation: 1s linear 0s 1 normal forwards running ring-int;
-				/* animation-duration set programmatically */
+				/* animation-duration set by code */
 			}
 
 			.flash {
@@ -246,9 +249,9 @@ body:not(.gaming) .gaming { display: none!important; }
 	100% { width: 100%; height: 100%; opacity: 0;  }
 }
 @keyframes flash {
-	0% { opacity: 1; box-shadow: inset 0 0 32px 16px #ff0; }
+	0% { opacity: 1; box-shadow: inset 0 0 32px 16px currentColor; }
 	20% { opacity: 1; }
-	100% { opacity: 0; box-shadow: inset 0 0 0px 0px #ff0; }
+	100% { opacity: 0; box-shadow: inset 0 0 0px 0px currentColor; }
 }
 
 .bottom-section {

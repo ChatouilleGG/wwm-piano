@@ -188,8 +188,8 @@ function toggleBackground(enable) {
 //@DONE: [SETTINGS] configurable incoming note hint style (eg. outside circle, inside circle, flash)
 //@DONE: [SETTINGS] configurable incoming note hint delay (how long it appears before it needs to be hit)
 //@DONE: [FEATURE] autoplay option to preview music
+//@DONE: [FEATURE] support notes colorization
 
-//@TODO: [FEATURE] support notes colorization in file format
 //@TODO: [QOL] auto save settings
 
 //@TODO: [FEATURE] macro recording + export sheet
@@ -285,7 +285,8 @@ function onFile(file) {
  * Extra lines and spaces and leading zeroes can be added for readability
  * Lines starting with // are ignored (comments)
  * Timestamps don't have to be ordered, and can be duplicate
- * Example:
+ * Insert #0 or #1 anywhere to change the current group (ex: left hand/right hand, or just to colorize notes)
+ * Example basic file format:
  
 // First part
    0 26
@@ -299,12 +300,21 @@ function onFile(file) {
 2400 26
 2800 26 29
 
+// Example with groups :
+// (optional) set current group 1
+#1
+0000 26
+0400 28
+0800 29
+// note 26 in group 1, note 29 in group 0, then back to group 1 for the next lines
+1200 26 #0 29 #1
+
 */
 function parseSheetText(text) {
 	gameSheet = new GameSheet();
 
 	let lines = text.split(/[\r\n]+/);
-
+	let group = 0;
 	for (let line of lines) {
 		line = line.trim();
 		if (!line)
@@ -315,9 +325,16 @@ function parseSheetText(text) {
 		if (words[0].startsWith('//'))
 			continue;
 
-		let timestamp = parseInt(words[0]);
-		for (let i=1; i<words.length; i++)
-			gameSheet.push(new Note(timestamp, parseInt(words[i])));
+		let timestamp;
+
+		for (let i=0; i<words.length; i++) {
+			if (words[i].startsWith('#'))
+				group = parseInt(words[i].slice(1));
+			else if (timestamp === undefined)
+				timestamp = parseInt(words[i]);
+			else
+				gameSheet.push(new Note(timestamp, parseInt(words[i]), group));
+		}
 	}
 
 	gameSheet.finalize();
@@ -328,9 +345,10 @@ const CHR_LOWER = '⌄';	//U+2304
 const CHR_UPPER = '⌃';	//U+2303
 
 class Note {
-	constructor(timestamp, code) {
+	constructor(timestamp, code, group) {
 		this.ts = timestamp;
 		this.originalCode = code;
+		this.group = group || 0;
 		this.setCode(code);
 	}
 
@@ -350,11 +368,15 @@ class Note {
 			'Q', CHR_UPPER+'Q', 'Z', CHR_LOWER+'E', 'E', 'R', CHR_UPPER+'R', 'T', CHR_UPPER+'T', 'Y', CHR_LOWER+'Y', 'U',
 		][this.code];
 
-		this.$ = $('.key[data-audio="' + ("0"+this.code).slice(-2) + '"]');
+		this.$ = $('.key[data-audio="' + pad0(2,this.code) + '"]');
+	}
+
+	getColor() {
+		return [false,'yellow'][this.group] || 'white';
 	}
 
 	toString() {
-		return ("000000"+this.ts).slice(-6) + " " + ("0"+this.code).slice(-2);
+		return pad0(6,this.ts) + " #" + this.group + " " + pad0(2,this.code);
 	}
 }
 
@@ -374,7 +396,7 @@ class GameSheet extends Array {
 		}
 
 		// Sort notes by timestamp
-		this.sort((a,b) => a.ts - b.ts || a.column - b.column || a.code - b.code);
+		this.sort((a,b) => a.ts - b.ts || a.group - b.group || a.code - b.code);
 
 		// Make sure the first note is always at InitialDelay
 		if (this[0] && this[0].ts != gameSettings.initialDelay) {
@@ -395,6 +417,10 @@ class GameSheet extends Array {
 				nextIndex++;
 			this.timeTable[currentSecond] = nextIndex;
 		}
+	}
+
+	toString() {
+		return this.join("\n");
 	}
 }
 
@@ -551,7 +577,7 @@ class GameState {
 
 		const columnsPosX = this.$sheet.find('.col').map((i, elem) => (elem.offsetLeft-canvas.offsetLeft)+elem.offsetWidth/2);
 
-		ctx.strokeStyle = '#0000';
+		ctx.strokeStyle = 'transparent';
 		ctx.lineWidth = 1;
 		ctx.font = 'bold 15px Helvetica';
 		ctx.textAlign = 'center';
@@ -569,13 +595,13 @@ class GameState {
 			let posX = columnsPosX[note.column];
 			let posY = canvas.height - canvas.height * ((note.ts - this.ts) / gameSettings.sheetVisibleLength);
 
-			ctx.fillStyle = '#fff';
+			ctx.fillStyle = note.getColor();
 			ctx.beginPath();
 			ctx.arc(posX, posY, NOTE_SIZE/2, NOTE_SIZE/2, 0, 2*Math.PI);
 			ctx.fill();
 			ctx.stroke();
 
-			ctx.fillStyle = '#000';
+			ctx.fillStyle = 'black';
 			ctx.fillText(note.label, posX, posY+1);
 		}
 	}
@@ -597,6 +623,7 @@ class GameState {
 				break;
 			if (note.ts > spawnTsMin) {
 				let $hint = $('<div class="'+gameSettings.noteHintStyle+'"></div>').appendTo(note.$);
+				$hint.css('color', note.getColor());
 				if (gameSettings.noteHintStyle != 'flash')
 					$hint.css('animation-duration', gameSettings.noteHintDuration+'ms');
 				registerNoteHintForDeletion($hint, gameSettings.noteHintDuration);
@@ -614,7 +641,7 @@ class GameState {
 			if (note.ts > currentTs)
 				break;
 			if (note.ts > previousTs && note.code)
-				triggerKey.call($('[data-audio="'+("0"+note.code).slice(-2)+'"]')[0]);
+				triggerKey.call($('[data-audio="'+pad0(2,note.code)+'"]')[0]);
 		}
 	}
 }
@@ -643,6 +670,11 @@ setInterval(deleteNoteHints, 1000);
 //============================================================
 // Utilities
 //============================================================
+
+function pad(chr, count, val) {
+	return (chr.repeat(count) + String(val)).slice(-count);
+}
+function pad0(count, val) { return pad('0', count, val) }
 
 function clamp(val,min,max) {
 	return Math.min(Math.max(val,min),max);

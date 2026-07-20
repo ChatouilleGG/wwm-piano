@@ -122,6 +122,12 @@
 		</label>
 
 		<label class="mt-2 inline-setting">
+			<span>Initial Delay</span>
+			<input type="number" min="0" max="10000" step="500" class="initialDelay" onchange="gameSettings.setInitialDelay(this.value)"/>
+			<span>ms</span>
+		</label>
+
+		<label class="mt-2 inline-setting">
 			<span>Speed</span>
 			<input type="number" min="10" max="800" step="10" class="speed" onchange="gameSettings.setSpeed(this.value/100)"/>
 			<span>%</span>

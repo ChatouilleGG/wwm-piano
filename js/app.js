@@ -362,9 +362,16 @@ class Note {
 class GameSheet extends Array {
 	constructor() {
 		super();
-		this.lastTs = 1000;	//dummy
+		this.finalize();
 	}
 	finalize() {
+		$('body').toggleClassHelper(this.length > 0, 'gaming', '');
+		$('.controls').toggleClassHelper(this.length > 0, 'fa-cog', 'fa-file-audio', true);
+
+		if (this.length == 0) {
+			this.lastTs = 999;
+			return;
+		}
 
 		// Sort notes by timestamp
 		this.sort((a,b) => a.ts - b.ts || a.column - b.column || a.code - b.code);
@@ -377,7 +384,7 @@ class GameSheet extends Array {
 		}
 
 		// Save the last timestamp (= track duration)
-		this.lastTs = this[this.length-1].ts || 1000;
+		this.lastTs = this[this.length-1].ts || 999;
 
 		// Build a reverse lookup map to quickly find notes by timestamp
 		// we'll use an array where indices are seconds (timestamp/1000) and value is the next note index
@@ -388,9 +395,6 @@ class GameSheet extends Array {
 				nextIndex++;
 			this.timeTable[currentSecond] = nextIndex;
 		}
-
-		$('body').toggleClassHelper(this.length > 0, 'gaming', '');
-		$('.controls').toggleClassHelper(this.length > 0, 'fa-cog', 'fa-file-audio', true);
 	}
 }
 
@@ -404,7 +408,7 @@ class GameSettings {
 		this.setSheetVisibleLength(3000);
 
 		// Initial delay before first note
-		this.initialDelay = 3000;
+		this.setInitialDelay(2000);
 
 		// Playback speed
 		this.setSpeed(1.0);
@@ -423,6 +427,13 @@ class GameSettings {
 		this.sheetVisibleLength = clamp(val, 500, 10000);
 		$('.sheetVisibleLength').val(this.sheetVisibleLength);
 		gameState && gameState.renderSheet();
+	}
+
+	setInitialDelay(val) {
+		this.initialDelay = clamp(val, 0, 10000);
+		$('.initialDelay').val(this.initialDelay);
+		gameSheet && gameSheet.finalize();
+		gameState && gameState.reset();
 	}
 
 	setSpeed(val) {

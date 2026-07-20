@@ -1,5 +1,6 @@
 
 body {
+	position: fixed;
 	width: 100vw;
 	height: 100vh;
 	font-size: 12pt;
@@ -300,6 +301,7 @@ body:not(.gaming) .gaming { display: none!important; }
 	padding: 0.75em 0.5em;
 	color: #0ffc;
 	border: 1px solid currentColor;
+	border-right: none;
 	background: #0001;
 	border-radius: 0.4em 0 0 0.4em;
 	display: grid;
@@ -310,6 +312,7 @@ body:not(.gaming) .gaming { display: none!important; }
 		background-color: #fff0;
 		border: 1px solid currentColor;
 		&:hover { background-color: #fff2; }
+		body:not(.gaming) & { border: none; }
 	}
 
 	button i { width: 1rem; }
@@ -325,7 +328,7 @@ body:not(.gaming) .gaming { display: none!important; }
 	background-color: #223;
 	border-left: 1px solid #445;
 	z-index: 100;
-	transition: 300ms;
+	transition: right 300ms;
 	&.visible {
 		right: 0;
 		box-shadow: 0 0 6px -1px black;

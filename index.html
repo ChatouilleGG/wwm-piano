@@ -155,8 +155,12 @@
 		</label>
 
 		<label class="mt-2 inline-setting">
-			<span>Auto Play Notes</span>
-			<input type="checkbox" class="autoPlay" onchange="gameSettings.setAutoPlay(this.checked)"/>
+			<span>Play Mode</span>
+			<select class="playMode" onchange="gameSettings.setPlayMode(this.value)">
+				<option value="">Normal</option>
+				<option value="pause">Pause until hit</option>
+				<option value="auto">Auto Play</option>
+			</select>
 		</label>
 	</div>
 

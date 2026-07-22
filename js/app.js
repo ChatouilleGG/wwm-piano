@@ -149,7 +149,7 @@ function triggerKey() {
 	sound.volume = volume;
 	sound.play();
 
-	$(this).addClass('trigger');
+	$(this).addClass('trigger').trigger('hit', [audioKey]);
 
 	clearTimeout(this.hlTimeout);
 	this.hlTimeout = setTimeout(() => {
@@ -189,6 +189,10 @@ function toggleBackground(enable) {
 //@DONE: [SETTINGS] configurable incoming note hint delay (how long it appears before it needs to be hit)
 //@DONE: [FEATURE] autoplay option to preview music
 //@DONE: [FEATURE] support notes colorization
+//@DONE: [FEATURE] mode where the game pauses until the right notes are hit
+
+//@TODO: [IMPROVEMENT] use canvas over piano to render note hints
+//@TODO: [FEATURE] new hint style where only the next incoming note/chord is lit up (and maybe the one after semi-lit as well)
 
 //@TODO: [QOL] auto save settings
 
@@ -239,8 +243,8 @@ $(document).ready(() => {
 	$(window).on('keydown', function(event) {
 		switch (event.originalEvent.code) {
 			case 'Space': gameState.togglePlay(); return false;
-			case 'ArrowLeft': gameState.seek(gameState.ts-1000); return false;
-			case 'ArrowRight': gameState.seek(gameState.ts+1000); return false;
+			case 'ArrowLeft': gameState.seek(gameState.ts-2000); return false;
+			case 'ArrowRight': gameState.seek(gameState.ts+2000); return false;
 			case 'Backspace': gameState.seek(0); return false;
 		}
 		return true;
@@ -386,6 +390,7 @@ class GameSheet extends Array {
 		super();
 		this.finalize();
 	}
+
 	finalize() {
 		$('body').toggleClassHelper(this.length > 0, 'gaming', '');
 		$('.controls').toggleClassHelper(this.length > 0, 'fa-cog', 'fa-file-audio', true);
@@ -419,6 +424,21 @@ class GameSheet extends Array {
 		}
 	}
 
+	// startTs, endTs are inclusive
+	// Callback arguments: note, index
+	// Callback return true to break iteration
+	iterateNotesInRange(startTs, endTs, callbackFn) {
+		const timeIndex = Math.floor(startTs/1000);
+		for (let i=this.timeTable[timeIndex]; i<this.length; i++) {
+			if (this[i].ts > endTs)
+				break;
+			if (this[i].ts >= startTs) {
+				if (callbackFn(this[i], i))
+					break;
+			}
+		}
+	}
+
 	toString() {
 		return this.join("\n");
 	}
@@ -446,7 +466,7 @@ class GameSettings {
 		this.setNoteHintDuration(1000);
 
 		// Automatically play notes (preview music)
-		this.setAutoPlay(false);
+		this.setPlayMode("");
 	}
 
 	setSheetVisibleLength(val) {
@@ -487,9 +507,9 @@ class GameSettings {
 		$('.noteHintDuration').val(this.noteHintDuration);
 	}
 
-	setAutoPlay(val) {
-		this.autoPlay = val;
-		$('.gamesettings .autoPlay')[0].checked = this.autoPlay;
+	setPlayMode(val) {
+		this.playMode = val;
+		$('.gamesettings .playMode').val(this.playMode);
 	}
 }
 
@@ -498,6 +518,9 @@ class GameState {
 		this.$cursor = $('.gametrack .cursor');
 		this.$sheet = $('.gamesheet');
 		this.canvas = this.$sheet.find('canvas')[0];
+
+		$('.piano').on('hit', '.key', (event,code) => this.onHit(parseInt(code)));
+		this.waitingForNotes = [];
 
 		this.reset();
 	}
@@ -509,9 +532,12 @@ class GameState {
 
 	play() {
 		this.playing = true;
-		this.previousTs = performance.now();
+		this.previousBrowserTs = performance.now();
 		this.animFrameID = requestAnimationFrame(this.tick.bind(this));
 		$('.controls').toggleClassHelper(this.playing, 'fa-pause', 'fa-play', true);
+
+		// clear the autopauser (user can unpause the autopause to skip note)
+		this.waitingForNotes = [];
 	}
 
 	pause() {
@@ -534,33 +560,50 @@ class GameState {
 		this.play();
 	}
 
+	// external seek - called by user (track bar, arrow keybinds)
 	seek(newTs) {
+		// clear notes hit state (this is for the auto-pause play mode)
+		for (let note of gameSheet)
+			delete note.hit;
+		this.waitingForNotes = [];
+
+		this.internalSeek(newTs);
+	}
+
+	// internal seek - called by tick - update this.ts, update visuals
+	internalSeek(newTs) {
 		this.ts = clamp(newTs, 0, gameSheet.lastTs);
 		this.$cursor.css('width', (this.ts/gameSheet.lastTs)*100 + '%');
 		this.renderSheet();
 	}
 
 	tick(browserTs) {
-		let dt = browserTs - this.previousTs;
+		let dt = browserTs - this.previousBrowserTs;
 		dt *= gameSettings.speed;
 
 		if (dt > 0) {
-			this.seek(this.ts + dt);
+			this.previousTs = this.ts;
+
+			this.internalSeek(this.ts + dt);
 
 			// Note: we use CSS animations for note hints
 			// cannot get them proper while paused/seeking
 			// so we detect and play them here instead of within seek()
-			this.renderNoteHints(this.ts-dt, this.ts);
+			this.renderNoteHints();
 
-			this.handleAutoPlay(this.ts-dt, this.ts);
+			if (gameSettings.playMode == 'auto')
+				this.handleModeAuto();
+			else if (gameSettings.playMode == 'pause')
+				this.handleModePause();
 		}
 
-		if (this.ts >= gameSheet.lastTs) {
+		if (this.ts >= gameSheet.lastTs)
 			this.pause();
-			return;
-		}
 
-		this.previousTs = browserTs;
+		if (!this.playing)
+			return;
+
+		this.previousBrowserTs = browserTs;
 		this.animFrameID = requestAnimationFrame(this.tick.bind(this));
 	}
 
@@ -584,14 +627,7 @@ class GameState {
 		ctx.textBaseline = 'middle';
 		const NOTE_SIZE = 28;
 
-		const timeIndex = Math.floor(this.ts/1000);
-		for (let i=gameSheet.timeTable[timeIndex]; i<gameSheet.length; i++) {
-			const note = gameSheet[i];
-			if (note.ts < this.ts)
-				continue;
-			if (note.ts > this.ts + gameSettings.sheetVisibleLength)
-				break;
-
+		gameSheet.iterateNotesInRange(this.ts, this.ts + gameSettings.sheetVisibleLength, (note) => {
 			let posX = columnsPosX[note.column];
 			let posY = canvas.height - canvas.height * ((note.ts - this.ts) / gameSettings.sheetVisibleLength);
 
@@ -603,45 +639,65 @@ class GameState {
 
 			ctx.fillStyle = 'black';
 			ctx.fillText(note.label, posX, posY+1);
-		}
+		});
 	}
 
-	renderNoteHints(previousTs, currentTs) {
+	renderNoteHints() {
 		if (!gameSettings.noteHintStyle)
 			return;
 
 		// Figure out which hints to spawn
 		// Hint duration is not affected by speed, but the moment to spawn them is !
 
-		const spawnTsMin = previousTs + gameSettings.noteHintDuration*gameSettings.speed;
-		const spawnTsMax = currentTs + gameSettings.noteHintDuration*gameSettings.speed;
+		const spawnTsMin = this.previousTs + gameSettings.noteHintDuration*gameSettings.speed;
+		const spawnTsMax = this.ts         + gameSettings.noteHintDuration*gameSettings.speed;
 
-		const timeIndex = Math.floor(spawnTsMin/1000);
-		for (let i=gameSheet.timeTable[timeIndex]; i<gameSheet.length; i++) {
-			const note = gameSheet[i];
-			if (note.ts > spawnTsMax)
-				break;
-			if (note.ts > spawnTsMin) {
-				let $hint = $('<div class="'+gameSettings.noteHintStyle+'"></div>').appendTo(note.$);
-				$hint.css('color', note.getColor());
-				if (gameSettings.noteHintStyle != 'flash')
-					$hint.css('animation-duration', gameSettings.noteHintDuration+'ms');
-				registerNoteHintForDeletion($hint, gameSettings.noteHintDuration);
-			}
-		}
+		gameSheet.iterateNotesInRange(spawnTsMin+1, spawnTsMax, (note) => {
+			let $hint = $('<div class="'+gameSettings.noteHintStyle+'"></div>').appendTo(note.$);
+			$hint.css('color', note.getColor());
+			if (gameSettings.noteHintStyle != 'flash')
+				$hint.css('animation-duration', gameSettings.noteHintDuration+'ms');
+			registerNoteHintForDeletion($hint, gameSettings.noteHintDuration);
+		});
 	}
 
-	handleAutoPlay(previousTs, currentTs) {
-		if (!gameSettings.autoPlay)
-			return;
-
-		const timeIndex = Math.floor(previousTs/1000);
-		for (let i=gameSheet.timeTable[timeIndex]; i<gameSheet.length; i++) {
-			const note = gameSheet[i];
-			if (note.ts > currentTs)
-				break;
-			if (note.ts > previousTs && note.code)
+	handleModeAuto() {
+		gameSheet.iterateNotesInRange(this.previousTs+1, this.ts, (note) => {
+			if (note.code)
 				triggerKey.call($('[data-audio="'+pad0(2,note.code)+'"]')[0]);
+		});
+	}
+
+	handleModePause() {
+		gameSheet.iterateNotesInRange(this.previousTs+1, this.ts, (note) => {
+			if (note.code && !note.hit) {
+				// rewind a bit to make sure the missed note(s) appear
+				this.internalSeek(note.ts);
+				this.pause();
+				this.waitingForNotes.push(note);
+			}
+		});
+	}
+
+	onHit(code) {
+		if (this.waitingForNotes.length > 0) {
+			for (let i=0; i<this.waitingForNotes.length; i++) {
+				if (this.waitingForNotes[i].code == code) {
+					this.waitingForNotes.splice(i,1);
+					if (this.waitingForNotes.length == 0)
+						this.play();
+					break;
+				}
+			}
+		}
+		else {
+			const TOLERANCE = 400;
+			gameSheet.iterateNotesInRange(this.ts, this.ts+TOLERANCE, (note) => {
+				if (note.code == code && !note.hit) {
+					note.hit = true;
+					return true;
+				}
+			});
 		}
 	}
 }

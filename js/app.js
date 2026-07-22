@@ -3,8 +3,6 @@
 // Piano Core (free play)
 //============================================================
 
-//@TODO: save options to local storage (volume, background)
-
 let $piano;
 
 let kbBindings = {};
@@ -21,7 +19,7 @@ class PianoKey {
 // map key name to PianoKey object
 let pianoMap = {};
 
-let volume = 0.5;
+let volume = parseFloat(localStorage.getItem('volume')) || 50;
 
 let backgrounds = [
 	{ url:"img/bg1.avif", logo:"dark", blur:true },
@@ -133,11 +131,13 @@ $(document).ready(() => {
 
 	$(window).on('mousewheel', (event) => {
 		if (event.originalEvent.wheelDeltaY > 0)
-			volume = Math.min(1, volume+0.05);
+			volume = Math.min(100, volume+5);
 		else if (event.originalEvent.wheelDeltaY < 0)
-			volume = Math.max(0, volume-0.05);
-		$('.volume').text(Math.round(volume*100));
+			volume = Math.max(0, volume-5);
+		$('.volume').text(volume);
+		localStorage.setItem('volume', volume);
 	});
+	$('.volume').text(volume);
 
 	toggleBackground($('.cb-bg').is(':checked'));
 
@@ -162,7 +162,7 @@ function triggerKey() {
 
 	let keyName = $(this).data('code');
 	let sound = pianoMap[keyName].audio.cloneNode();
-	sound.volume = volume;
+	sound.volume = volume/100;
 	sound.play();
 
 	$(this).addClass('trigger').trigger('hit', [keyName]);
@@ -208,8 +208,9 @@ function toggleBackground(enable) {
 //@DONE: [FEATURE] mode where the game pauses until the right notes are hit
 //@DONE: [IMPROVEMENT] use canvas over piano to render note hints
 //@DONE: [FEATURE] new hint style where only the next incoming note/chord is lit up (and maybe the one after semi-lit as well)
+//@DONE: [QOL] auto save settings
 
-//@TODO: [QOL] auto save settings
+//@TODO: [QOL] some settings should be specifiable in sheet file (speed, shift)
 
 //@TODO: [FEATURE] macro recording + export sheet
 //@TODO: [FEATURE] fixup timestamps after recording
@@ -461,50 +462,76 @@ class GameSheet extends Array {
 
 class GameSettings {
 	constructor() {
-		this.reset();
+		this.defaults = {
+
+			// Game sheet visible length in milliseconds
+			sheetVisibleLength: 3000,
+
+			// Initial delay before first note
+			initialDelay: 2000,
+
+			// Playback speed
+			speed: 100,
+
+			// Shift all notes by amount
+			shift: 0,
+
+			// Upcoming notes indicators
+			noteHintStyle: 'ring-ext',
+			noteHintDuration: 1000,
+
+			// Play mode (normal, auto-pause, autoplay)
+			playMode: '',
+
+		};
+		this.load();
 	}
 
-	reset() {
-		// Game sheet visible length in milliseconds
-		this.setSheetVisibleLength(3000);
+	load() {
+		this._load('sheetVisibleLength', parseInt);
+		this._load('initialDelay', parseInt);
+		this._load('speed', parseInt);
+		this._load('shift', parseInt);
+		this._load('noteHintStyle');
+		this._load('noteHintDuration', parseInt);
+		this._load('playMode');
+	}
 
-		// Initial delay before first note
-		this.setInitialDelay(2000);
+	// simplify code for loading
+	_load(key, parserFn) {
+		let setterName = 'set'+key[0].toUpperCase()+key.slice(1);
+		let val = loadFromHash(key, parserFn, this.defaults[key]);
+		this[setterName](val);
+		
+	}
 
-		// Playback speed
-		this.setSpeed(1.0);
-
-		// Shift all notes by amount
-		this.setShift(0);
-
-		this.setNoteHintStyle('ring-ext');
-		this.setNoteHintDuration(1000);
-
-		// Automatically play notes (preview music)
-		this.setPlayMode("");
+	// factor code for all setters
+	// 1. set option to new value
+	// 2. update corresponding Html element
+	// 3. save to hash
+	_set(key, val) {
+		this[key] = val;
+		$('.gamesettings .'+key).val(this[key]);  //note: will not work with checkboxes
+		saveToHash(key, this[key], this.defaults[key]);
 	}
 
 	setSheetVisibleLength(val) {
-		this.sheetVisibleLength = clamp(val, 500, 10000);
-		$('.sheetVisibleLength').val(this.sheetVisibleLength);
+		this._set('sheetVisibleLength', clamp(val, 500, 10000));
 		gameState && gameState.renderSheet();
 	}
 
 	setInitialDelay(val) {
-		this.initialDelay = clamp(val, 0, 10000);
-		$('.initialDelay').val(this.initialDelay);
+		this._set('initialDelay', clamp(val, 0, 10000));
 		gameSheet && gameSheet.finalize();
 		gameState && gameState.reset();
 	}
 
 	setSpeed(val) {
-		this.speed = clamp(val, 0.1, 8.0);
-		$('.gamesettings .speed').val(Math.round(this.speed*100));
+		this._set('speed', clamp(val, 10, 800));
 	}
 
 	setShift(val) {
-		this.shift = clamp(val, -24, 24);
-		$('.gamesettings .shift').val(this.shift);
+		this._set('shift', clamp(val, -24, +24));
 		if (gameSheet) {
 			for (let note of gameSheet)
 				note.setCode(note.originalCode);	// shift applied inside
@@ -513,20 +540,17 @@ class GameSettings {
 	}
 
 	setNoteHintStyle(val) {
-		this.noteHintStyle = val;
-		$('.noteHintStyle').val(this.noteHintStyle);
+		this._set('noteHintStyle', val);
 		gameState && gameState.renderNoteHints();
 	}
 
 	setNoteHintDuration(val) {
-		this.noteHintDuration = clamp(val, 100, 2000);
-		$('.noteHintDuration').val(this.noteHintDuration);
+		this._set('noteHintDuration', clamp(val, 100, 2000));
 		gameState && gameState.renderNoteHints();
 	}
 
 	setPlayMode(val) {
-		this.playMode = val;
-		$('.gamesettings .playMode').val(this.playMode);
+		this._set('playMode', val);
 	}
 }
 
@@ -598,7 +622,7 @@ class GameState {
 
 	tick(browserTs) {
 		let dt = browserTs - this.previousBrowserTs;
-		dt *= gameSettings.speed;
+		dt *= gameSettings.speed/100;
 
 		if (dt > 0) {
 			this.previousTs = this.ts;
@@ -731,7 +755,7 @@ class GameState {
 	}
 
 	handleModeAuto() {
-		gameSheet.iterateNotesInRange(this.previousTs+1, this.ts, (note) => {
+		gameSheet.iterateNotesInRange(this.previousTs+0.000001, this.ts, (note) => {
 			if (note.code)
 				triggerKey.call(note.$[0]);
 		});
@@ -739,7 +763,7 @@ class GameState {
 
 	handleModePause() {
 		let pauseTs;
-		gameSheet.iterateNotesInRange(this.previousTs+1, this.ts, (note) => {
+		gameSheet.iterateNotesInRange(this.previousTs+0.000001, this.ts, (note) => {
 			if (note.code && !note.hit) {
 				if (pauseTs === undefined)
 					pauseTs = note.ts;
@@ -806,6 +830,30 @@ setInterval(deleteNoteHints, 1000);
 //============================================================
 // Utilities
 //============================================================
+
+function getHashParams() {
+	let qs = window.location.hash;
+	while (qs.startsWith('#'))
+		qs = qs.slice(1);
+	return new URLSearchParams(qs);
+}
+
+function loadFromHash(key, parserFn, fallback) {
+	let params = getHashParams();
+	return params.has(key) ? (parserFn ? parserFn(params.get(key)) : params.get(key)) : fallback;
+}
+
+function saveToHash(key, value, defaultValue) {
+	let params = getHashParams();
+	if (value === defaultValue) {
+		params.delete(key);
+		window.location.hash = params.toString();
+	}
+	else if (String(value) !== params.get(key)) {
+		params.set(key, value);
+		window.location.hash = params.toString();
+	}
+}
 
 function pad(chr, count, val) {
 	return (chr.repeat(count) + String(val)).slice(-count);

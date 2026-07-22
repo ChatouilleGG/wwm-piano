@@ -5,10 +5,21 @@
 
 //@TODO: save options to local storage (volume, background)
 
+let $piano;
+
 let kbBindings = {};
 let modifier = "regul";	// regul | lower | upper
 
-let audioMap = {};
+class PianoKey {
+	constructor($, name, audio) {
+		this.$ = $;
+		this.name = name;
+		this.code = parseInt(name);
+		this.audio = audio;
+	}
+}
+// map key name to PianoKey object
+let pianoMap = {};
 
 let volume = 0.5;
 
@@ -22,14 +33,22 @@ let backgrounds = [
 
 $(document).ready(() => {
 
+	$piano = $('.piano');
+
+	$piano.find('.key').each((i,elem) => {
+		let name = $(elem).data('code');
+		pianoMap[name] = new PianoKey($(elem), name, null);
+
+		let bind = $(elem).data('bind');
+		kbBindings[bind] = elem;
+	});
+
 	// NOTE: We cannot load custom binary in local mode, so we still need individual sound files to fallback to.
 	if (window.location.href.startsWith('file://')) {
 
 		// Load individual sound files
-		$('.key').each((i,elem) => {
-			let audioKey = $(elem).data('audio');
-			audioMap[audioKey] = new Audio(resolveAudioUri(audioKey));
-		});
+		for (let key of Object.values(pianoMap))
+			key.audio = new Audio(resolveAudioUri(key.name));
 
 	}
 	else {
@@ -72,12 +91,14 @@ $(document).ready(() => {
 					let data = buf.readArrayBuffer();
 					console.log("data", data);
 
-					// Create blob with a local URL (alternatively could use data-url, not sure what is best)
-					let blob = new Blob([data], {type:'audio/mp3'});
-					let url = URL.createObjectURL(blob);
+					if (pianoMap[name]) {
+						// Create blob with a local URL (alternatively could use data-url, not sure what is best)
+						let blob = new Blob([data], {type:'audio/mp3'});
+						let url = URL.createObjectURL(blob);
 
-					// Bind it
-					audioMap[name] = new Audio(url);
+						// Bind it
+						pianoMap[name].audio = new Audio(url);
+					}
 				}
 			}
 		};
@@ -85,12 +106,7 @@ $(document).ready(() => {
 
 	}
 
-	$('.piano').on('mousedown', '.key', triggerKey);
-
-	$('.key').each((i,elem) => {
-		let bind = $(elem).data('bind');
-		kbBindings[bind] = elem;
-	});
+	$piano.on('mousedown', '.key', triggerKey);
 
 	$(window).on('keydown keyup', (event) => {
 		if (event.shiftKey)
@@ -144,12 +160,12 @@ function updateShowBinds(modifier) {
 function triggerKey() {
 	//console.log(this);
 
-	let audioKey = $(this).data('audio');
-	let sound = audioMap[audioKey].cloneNode();
+	let keyName = $(this).data('code');
+	let sound = pianoMap[keyName].audio.cloneNode();
 	sound.volume = volume;
 	sound.play();
 
-	$(this).addClass('trigger').trigger('hit', [audioKey]);
+	$(this).addClass('trigger').trigger('hit', [keyName]);
 
 	clearTimeout(this.hlTimeout);
 	this.hlTimeout = setTimeout(() => {
@@ -190,9 +206,8 @@ function toggleBackground(enable) {
 //@DONE: [FEATURE] autoplay option to preview music
 //@DONE: [FEATURE] support notes colorization
 //@DONE: [FEATURE] mode where the game pauses until the right notes are hit
-
-//@TODO: [IMPROVEMENT] use canvas over piano to render note hints
-//@TODO: [FEATURE] new hint style where only the next incoming note/chord is lit up (and maybe the one after semi-lit as well)
+//@DONE: [IMPROVEMENT] use canvas over piano to render note hints
+//@DONE: [FEATURE] new hint style where only the next incoming note/chord is lit up (and maybe the one after semi-lit as well)
 
 //@TODO: [QOL] auto save settings
 
@@ -372,7 +387,7 @@ class Note {
 			'Q', CHR_UPPER+'Q', 'Z', CHR_LOWER+'E', 'E', 'R', CHR_UPPER+'R', 'T', CHR_UPPER+'T', 'Y', CHR_LOWER+'Y', 'U',
 		][this.code];
 
-		this.$ = $('.key[data-audio="' + pad0(2,this.code) + '"]');
+		this.$ = $('.key[data-code="' + pad0(2,this.code) + '"]');
 	}
 
 	getColor() {
@@ -500,11 +515,13 @@ class GameSettings {
 	setNoteHintStyle(val) {
 		this.noteHintStyle = val;
 		$('.noteHintStyle').val(this.noteHintStyle);
+		gameState && gameState.renderNoteHints();
 	}
 
 	setNoteHintDuration(val) {
 		this.noteHintDuration = clamp(val, 100, 2000);
 		$('.noteHintDuration').val(this.noteHintDuration);
+		gameState && gameState.renderNoteHints();
 	}
 
 	setPlayMode(val) {
@@ -517,9 +534,10 @@ class GameState {
 	constructor() {
 		this.$cursor = $('.gametrack .cursor');
 		this.$sheet = $('.gamesheet');
-		this.canvas = this.$sheet.find('canvas')[0];
+		this.sheetCanvas = this.$sheet.find('canvas')[0];
+		this.pianoCanvas = $piano.find('canvas')[0];
 
-		$('.piano').on('hit', '.key', (event,code) => this.onHit(parseInt(code)));
+		$piano.on('hit', '.key', (event,code) => this.onHit(parseInt(code)));
 		this.waitingForNotes = [];
 
 		this.reset();
@@ -575,6 +593,7 @@ class GameState {
 		this.ts = clamp(newTs, 0, gameSheet.lastTs);
 		this.$cursor.css('width', (this.ts/gameSheet.lastTs)*100 + '%');
 		this.renderSheet();
+		this.renderNoteHints();
 	}
 
 	tick(browserTs) {
@@ -585,11 +604,6 @@ class GameState {
 			this.previousTs = this.ts;
 
 			this.internalSeek(this.ts + dt);
-
-			// Note: we use CSS animations for note hints
-			// cannot get them proper while paused/seeking
-			// so we detect and play them here instead of within seek()
-			this.renderNoteHints();
 
 			if (gameSettings.playMode == 'auto')
 				this.handleModeAuto();
@@ -608,7 +622,7 @@ class GameState {
 	}
 
 	renderSheet() {
-		const canvas = this.canvas;
+		const canvas = this.sheetCanvas;
 		canvas.width = this.$sheet.width();
 		canvas.height = this.$sheet.height();
 
@@ -620,8 +634,6 @@ class GameState {
 
 		const columnsPosX = this.$sheet.find('.col').map((i, elem) => (elem.offsetLeft-canvas.offsetLeft)+elem.offsetWidth/2);
 
-		ctx.strokeStyle = 'transparent';
-		ctx.lineWidth = 1;
 		ctx.font = 'bold 15px Helvetica';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
@@ -635,7 +647,6 @@ class GameState {
 			ctx.beginPath();
 			ctx.arc(posX, posY, NOTE_SIZE/2, NOTE_SIZE/2, 0, 2*Math.PI);
 			ctx.fill();
-			ctx.stroke();
 
 			ctx.fillStyle = 'black';
 			ctx.fillText(note.label, posX, posY+1);
@@ -643,35 +654,101 @@ class GameState {
 	}
 
 	renderNoteHints() {
-		if (!gameSettings.noteHintStyle)
+		const canvas = this.pianoCanvas;
+		canvas.width = $piano.width();
+		canvas.height = $piano.outerHeight();
+
+		const ctx = canvas.getContext('2d');
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		if (!gameSettings.noteHintStyle || !gameSheet.length)
 			return;
 
-		// Figure out which hints to spawn
-		// Hint duration is not affected by speed, but the moment to spawn them is !
+		let maxTs = this.ts + gameSettings.noteHintDuration;
 
-		const spawnTsMin = this.previousTs + gameSettings.noteHintDuration*gameSettings.speed;
-		const spawnTsMax = this.ts         + gameSettings.noteHintDuration*gameSettings.speed;
+		// Hint duration does not apply in this mode, we always illuminate the upcoming chord (and slightly the one after)
+		if (gameSettings.noteHintStyle == 'illuminate-next')
+			maxTs = gameSheet.lastTs;
 
-		gameSheet.iterateNotesInRange(spawnTsMin+1, spawnTsMax, (note) => {
-			let $hint = $('<div class="'+gameSettings.noteHintStyle+'"></div>').appendTo(note.$);
-			$hint.css('color', note.getColor());
-			if (gameSettings.noteHintStyle != 'flash')
-				$hint.css('animation-duration', gameSettings.noteHintDuration+'ms');
-			registerNoteHintForDeletion($hint, gameSettings.noteHintDuration);
+		// For illuminate-next
+		let nextChordTs, nextNextChordTs;
+
+		gameSheet.iterateNotesInRange(this.ts, maxTs, (note) => {
+			const rel = note.$.offsetRelativeTo(canvas);
+			const noteRadius = note.$.outerWidth()/2;
+			let posX = rel.left + noteRadius;
+			let posY = rel.top + noteRadius;
+
+			ctx.strokeStyle = ctx.fillStyle = note.getColor();
+			let progress = 1.0 - (note.ts - this.ts)/gameSettings.noteHintDuration;
+
+			switch (gameSettings.noteHintStyle) {
+				case 'ring-ext': {
+					let radius = lerp(noteRadius+20, noteRadius, progress);
+					ctx.globalAlpha = lerp(0, 1, progress*5);
+					ctx.beginPath();
+					ctx.arc(posX, posY, radius, radius, 0, 2*Math.PI);
+					//ctx.lineWidth = 2;
+					ctx.stroke();
+					break;
+				}
+				case 'ring-int': {
+					let radius = lerp(0, noteRadius, progress);
+					ctx.globalAlpha = lerp(0, 1, progress*5);
+					ctx.beginPath();
+					ctx.arc(posX, posY, radius, radius, 0, 2*Math.PI);
+					//ctx.lineWidth = 2;
+					ctx.stroke();
+					break;
+				}
+				case 'illuminate-cont': {
+					ctx.globalAlpha = lerp(0, 0.65, progress);
+					ctx.beginPath();
+					ctx.arc(posX, posY, noteRadius, noteRadius, 0, 2*Math.PI);
+					ctx.fill();
+					break;
+				}
+				case 'illuminate-next': {
+					if (nextChordTs === undefined) {
+						nextChordTs = note.ts;
+						ctx.globalAlpha = 0.65;
+					}
+					else if (note.ts > nextChordTs && nextNextChordTs === undefined) {
+						nextNextChordTs = note.ts;
+						ctx.globalAlpha = 0.2;
+					}
+					else if (note.ts > nextNextChordTs) {
+						return true;  //break from loop
+					}
+
+					ctx.beginPath();
+					ctx.arc(posX, posY, noteRadius, noteRadius, 0, 2*Math.PI);
+					ctx.fill();
+					break;  //break from switch
+				}
+			}
 		});
 	}
 
 	handleModeAuto() {
 		gameSheet.iterateNotesInRange(this.previousTs+1, this.ts, (note) => {
 			if (note.code)
-				triggerKey.call($('[data-audio="'+pad0(2,note.code)+'"]')[0]);
+				triggerKey.call(note.$[0]);
 		});
 	}
 
 	handleModePause() {
+		let pauseTs;
 		gameSheet.iterateNotesInRange(this.previousTs+1, this.ts, (note) => {
 			if (note.code && !note.hit) {
-				// rewind a bit to make sure the missed note(s) appear
+				if (pauseTs === undefined)
+					pauseTs = note.ts;
+
+				// If notes are very close, or if a deltatime is high, we may get multiple chords in a single frame - only process the first one
+				if (note.ts > pauseTs)
+					return true;  //break
+
+				// rewind a bit to make sure the missed chord appears
 				this.internalSeek(note.ts);
 				this.pause();
 				this.waitingForNotes.push(note);
@@ -690,10 +767,13 @@ class GameState {
 				}
 			}
 		}
-		else {
-			const TOLERANCE = 400;
+		else if (this.playing) {
+			const TOLERANCE = 300;
+			let nextChordTs;
 			gameSheet.iterateNotesInRange(this.ts, this.ts+TOLERANCE, (note) => {
-				if (note.code == code && !note.hit) {
+				if (nextChordTs === undefined)
+					nextChordTs = note.ts;
+				if (note.ts == nextChordTs && note.code == code && !note.hit) {
 					note.hit = true;
 					return true;
 				}
@@ -734,6 +814,15 @@ function pad0(count, val) { return pad('0', count, val) }
 
 function clamp(val,min,max) {
 	return Math.min(Math.max(val,min),max);
+}
+function lerp(a, b, alpha) {
+	return a + alpha*(b-a);
+}
+
+$.fn.offsetRelativeTo = function(otherElem) {
+	let me = this.offset();
+	let other = $(otherElem).offset();
+	return { left: me.left - other.left, top: me.top - other.top };
 }
 
 $.fn.toggleClassHelper = function(b, classTrue, classFalse, bFindInChildren) {

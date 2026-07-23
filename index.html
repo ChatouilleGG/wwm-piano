@@ -104,7 +104,10 @@
 	<div class="controls">
 		<button type="button" class="btn" onclick="openSettings()"><i class="fa fa-file-audio"></i></button>
 		<button type="button" class="btn gaming" onclick="gameState.togglePlay()"><i class="fa fa-play"></i></button>
-		<button type="button" class="btn gaming" onclick="gameState.playFromStart()"><i class="fa fa-arrow-rotate-right"></i></button>
+
+		<!-- recording -->
+		<i class="fa fa-registered gaming recording"></i>
+		<button type="button" class="btn gaming recording" onclick="gameState.undoRecording()"><i class="fa fa-undo"></i></button>
 	</div>
 
 	<div class="gamesettings" tabindex="0">
@@ -114,7 +117,10 @@
 
 		<input type="file"/>
 
-		<textarea class="mt-2 form-control" placeholder="Or edit/paste text directly…"></textarea>
+		<div class="textAreaContainer">
+			<textarea class="mt-2 form-control" placeholder="Or edit/paste text directly…"></textarea>
+			<button type="button" class="btn btn-link btn-sm" onclick="downloadSheetText()"><i class="fa fa-download"></i></button>
+		</div>
 
 		<label class="mt-2 inline-setting">
 			<span>Sheet Length</span>
@@ -162,7 +168,14 @@
 				<option value="">Normal</option>
 				<option value="pause">Pause until hit</option>
 				<option value="auto">Auto Play</option>
+				<option value="record">Recording</option>
 			</select>
+		</label>
+
+		<label class="mt-2 inline-setting">
+			<span>Rec. Resolution</span>
+			<input type="number" min="50" max="1000" step="50" class="recordingResolution" onchange="gameSettings.setRecordingResolution(this.value)"/>
+			<span>ms</span>
 		</label>
 	</div>
 

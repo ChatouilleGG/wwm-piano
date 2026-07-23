@@ -264,10 +264,11 @@ body:not(.gaming) .gaming { display: none!important; }
 	color: #0ffc;
 	border: 1px solid currentColor;
 	border-right: none;
-	background: #0001;
+	background: #607080;
 	border-radius: 0.4em 0 0 0.4em;
 	display: grid;
 	grid-gap: 0.75em;
+	justify-items: center;
 
 	.btn {
 		color: inherit;
@@ -276,6 +277,8 @@ body:not(.gaming) .gaming { display: none!important; }
 		&:hover { background-color: #fff2; }
 		body:not(.gaming) & { border: none; }
 	}
+
+	.recording { color: #e44; }
 
 	button i { width: 1rem; }
 	.fa-file-audio { font-size: 1.2rem; }
@@ -324,6 +327,15 @@ body:not(.gaming) .gaming { display: none!important; }
 		font-family: monospace;
 		line-height: 1.1;
 		height: 10em;
+	}
+	.textAreaContainer {
+		align-self: stretch;
+		position: relative;
+		button {
+			position: absolute;
+			right: 0;
+			bottom: 0;
+		}
 	}
 
 	label.inline-setting {

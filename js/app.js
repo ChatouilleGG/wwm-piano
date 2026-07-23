@@ -209,11 +209,17 @@ function toggleBackground(enable) {
 //@DONE: [IMPROVEMENT] use canvas over piano to render note hints
 //@DONE: [FEATURE] new hint style where only the next incoming note/chord is lit up (and maybe the one after semi-lit as well)
 //@DONE: [QOL] auto save settings
+//@DONE: [FEATURE] recording mode - with timer resolution & multipass recording
+
+//@TODO: [QOL] edit notes on the gamesheet with right click -> contextmenu (assign group, move, batch move, delete)
 
 //@TODO: [QOL] some settings should be specifiable in sheet file (speed, shift)
 
-//@TODO: [FEATURE] macro recording + export sheet
-//@TODO: [FEATURE] fixup timestamps after recording
+let $sheetText;
+
+let gameSettings;
+let gameSheet;
+let gameState;
 
 $(document).ready(() => {
 
@@ -271,8 +277,10 @@ $(document).ready(() => {
 		event.stopPropagation();
 	});
 
-	$('.gamesettings textarea').on('change', function() {
-		parseSheetText(this.value);
+	$sheetText = $('.gamesettings textarea');
+	$sheetText.on('change', function() {
+		gameSheet = GameSheet.createFromText(this.value);
+		gameState.reset();
 	});
 
 	gameSettings = new GameSettings();
@@ -288,13 +296,23 @@ function closeSettings() {
 	document.activeElement.blur();
 }
 
-let gameSettings;
-let gameSheet;
-let gameState;
+function updateGamingMode() {
+	let b = (gameSheet && gameSheet.length > 0) || (gameSettings && gameSettings.playMode == 'record');
+	$('body').toggleClassHelper(b, 'gaming', '');
+	$('.controls').toggleClassHelper(b, 'fa-cog', 'fa-file-audio', true);
+}
+
+function downloadSheetText() {
+	let text = $sheetText.val().trim();
+	if (text) {
+		let blob = new Blob([text], { type:'text/plain' });
+		downloadBlob(blob, 'sheet.txt');
+	}
+}
 
 function onFile(file) {
 	readFileAs(file, 'text')
-	.then(text => $('.gamesettings textarea').val(text).change())
+	.then(text => $sheetText.val(text).change())
 	.catch(commonErrorHandler);
 }
 
@@ -330,36 +348,6 @@ function onFile(file) {
 1200 26 #0 29 #1
 
 */
-function parseSheetText(text) {
-	gameSheet = new GameSheet();
-
-	let lines = text.split(/[\r\n]+/);
-	let group = 0;
-	for (let line of lines) {
-		line = line.trim();
-		if (!line)
-			continue;
-
-		let words = line.split(/\s+/);
-
-		if (words[0].startsWith('//'))
-			continue;
-
-		let timestamp;
-
-		for (let i=0; i<words.length; i++) {
-			if (words[i].startsWith('#'))
-				group = parseInt(words[i].slice(1));
-			else if (timestamp === undefined)
-				timestamp = parseInt(words[i]);
-			else
-				gameSheet.push(new Note(timestamp, parseInt(words[i]), group));
-		}
-	}
-
-	gameSheet.finalize();
-	gameState.reset();
-}
 
 const CHR_LOWER = '⌄';	//U+2304
 const CHR_UPPER = '⌃';	//U+2303
@@ -396,7 +384,7 @@ class Note {
 	}
 
 	toString() {
-		return pad0(6,this.ts) + " #" + this.group + " " + pad0(2,this.code);
+		return this.ts + " #" + this.group + " " + pad0(2,this.code);
 	}
 }
 
@@ -407,12 +395,44 @@ class GameSheet extends Array {
 		this.finalize();
 	}
 
+	static createFromText(text) {
+		let sheet = new GameSheet();
+		sheet.parse(text);
+		return sheet;
+	}
+
+	parse(text) {
+		let lines = text.split(/[\r\n]+/);
+		let group = 0;
+		for (let line of lines) {
+			line = line.trim();
+			if (!line)
+				continue;
+
+			let words = line.split(/\s+/);
+
+			if (words[0].startsWith('//'))
+				continue;
+
+			let timestamp;
+
+			for (let i=0; i<words.length; i++) {
+				if (words[i].startsWith('#'))
+					group = parseInt(words[i].slice(1));
+				else if (timestamp === undefined)
+					timestamp = parseInt(words[i]);
+				else
+					this.push(new Note(timestamp, parseInt(words[i]), group));
+			}
+		}
+		this.finalize();
+	}
+
 	finalize() {
-		$('body').toggleClassHelper(this.length > 0, 'gaming', '');
-		$('.controls').toggleClassHelper(this.length > 0, 'fa-cog', 'fa-file-audio', true);
+		updateGamingMode();
 
 		if (this.length == 0) {
-			this.lastTs = 999;
+			this.lastTs = gameSettings.initialDelay;
 			return;
 		}
 
@@ -427,7 +447,7 @@ class GameSheet extends Array {
 		}
 
 		// Save the last timestamp (= track duration)
-		this.lastTs = this[this.length-1].ts || 999;
+		this.lastTs = this[this.length-1].ts || gameSettings.initialDelay;
 
 		// Build a reverse lookup map to quickly find notes by timestamp
 		// we'll use an array where indices are seconds (timestamp/1000) and value is the next note index
@@ -456,7 +476,32 @@ class GameSheet extends Array {
 	}
 
 	toString() {
-		return this.join("\n");
+		//return this.join("\n");
+
+		if (this.length == 0)
+			return "";
+
+		let initialDelay = this[0].ts;
+		let maxTsLength = String(this.lastTs - initialDelay).length;
+		let group = 0;
+
+		let txt = pad0(maxTsLength, 0);
+
+		for (let i=0; i<this.length; i++) {
+			const note = this[i];
+
+			if (i > 0 && note.ts != this[i-1].ts)
+				txt += "\n" + pad0(maxTsLength, note.ts - initialDelay);
+
+			if (note.group != group) {
+				txt += " #" + note.group;
+				group = note.group;
+			}
+
+			txt += " " + pad0(2, note.code);
+		}
+
+		return txt;
 	}
 }
 
@@ -483,6 +528,8 @@ class GameSettings {
 			// Play mode (normal, auto-pause, autoplay)
 			playMode: '',
 
+			// Timestamp snapping resolution when recording
+			recordingResolution: 100,
 		};
 		this.load();
 	}
@@ -495,6 +542,7 @@ class GameSettings {
 		this._load('noteHintStyle');
 		this._load('noteHintDuration', parseInt);
 		this._load('playMode');
+		this._load('recordingResolution', parseInt);
 	}
 
 	// simplify code for loading
@@ -551,6 +599,12 @@ class GameSettings {
 
 	setPlayMode(val) {
 		this._set('playMode', val);
+		updateGamingMode();
+		$('.recording').toggleClassHelper(this.playMode == 'record', '', 'd-none');
+	}
+
+	setRecordingResolution(val) {
+		this._set('recordingResolution', val);
 	}
 }
 
@@ -580,6 +634,9 @@ class GameState {
 
 		// clear the autopauser (user can unpause the autopause to skip note)
 		this.waitingForNotes = [];
+
+		// for recording
+		this.isNewRecordingSession = true;
 	}
 
 	pause() {
@@ -614,8 +671,9 @@ class GameState {
 
 	// internal seek - called by tick - update this.ts, update visuals
 	internalSeek(newTs) {
-		this.ts = clamp(newTs, 0, gameSheet.lastTs);
-		this.$cursor.css('width', (this.ts/gameSheet.lastTs)*100 + '%');
+		//this.ts = clamp(newTs, 0, gameSheet.lastTs);
+		this.ts = newTs;
+		this.$cursor.css('width', clamp((this.ts/gameSheet.lastTs)*100,0,100) + '%');
 		this.renderSheet();
 		this.renderNoteHints();
 	}
@@ -635,7 +693,7 @@ class GameState {
 				this.handleModePause();
 		}
 
-		if (this.ts >= gameSheet.lastTs)
+		if (this.ts >= gameSheet.lastTs && gameSettings.playMode != 'record')
 			this.pause();
 
 		if (!this.playing)
@@ -652,7 +710,22 @@ class GameState {
 
 		const ctx = canvas.getContext('2d');
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		
+
+		// When recording, display horizontal lines as metronome, using 1/4 sheetVisibleLength as resolution
+		if (gameSettings.playMode == 'record') {
+			const count = 4;
+			const resolution = gameSettings.sheetVisibleLength / count;
+			const nextTs = Math.ceil(this.ts / resolution) * resolution;
+			const sizeY = canvas.height / count;
+			ctx.strokeStyle = '#0ff4';
+			for (let posY = sizeY * (nextTs - this.ts) / resolution; posY < canvas.height; posY += sizeY) {
+				ctx.beginPath();
+				ctx.moveTo(0, canvas.height-posY);
+				ctx.lineTo(canvas.width, canvas.height-posY);
+				ctx.stroke();
+			}
+		}
+
 		if (!gameSheet.length)
 			return;
 
@@ -781,27 +854,59 @@ class GameState {
 	}
 
 	onHit(code) {
-		if (this.waitingForNotes.length > 0) {
-			for (let i=0; i<this.waitingForNotes.length; i++) {
-				if (this.waitingForNotes[i].code == code) {
-					this.waitingForNotes.splice(i,1);
-					if (this.waitingForNotes.length == 0)
-						this.play();
-					break;
+		if (gameSettings.playMode == 'pause') {
+			if (this.waitingForNotes.length > 0) {
+				for (let i=0; i<this.waitingForNotes.length; i++) {
+					if (this.waitingForNotes[i].code == code) {
+						this.waitingForNotes.splice(i,1);
+						if (this.waitingForNotes.length == 0)
+							this.play();
+						break;
+					}
 				}
 			}
+			else if (this.playing) {
+				const TOLERANCE = 300;
+				let nextChordTs;
+				gameSheet.iterateNotesInRange(this.ts, this.ts+TOLERANCE, (note) => {
+					if (nextChordTs === undefined)
+						nextChordTs = note.ts;
+					if (note.ts == nextChordTs && note.code == code && !note.hit) {
+						note.hit = true;
+						return true;
+					}
+				});
+			}
 		}
-		else if (this.playing) {
-			const TOLERANCE = 300;
-			let nextChordTs;
-			gameSheet.iterateNotesInRange(this.ts, this.ts+TOLERANCE, (note) => {
-				if (nextChordTs === undefined)
-					nextChordTs = note.ts;
-				if (note.ts == nextChordTs && note.code == code && !note.hit) {
-					note.hit = true;
-					return true;
-				}
-			});
+		else if (gameSettings.playMode == 'record' && this.playing) {
+			let snapTs = Math.round(this.ts / gameSettings.recordingResolution) * gameSettings.recordingResolution;
+
+			let note = new Note(snapTs, code, 0);
+			gameSheet.push(note);
+			gameSheet.finalize();	//careful: this can modify note.ts
+
+			// Backup the sheet text before overwriting everything with gameSheet.toString()
+			// Also save the timestamp of the first added note, we'll go back there when pressing undo button
+			if (this.isNewRecordingSession) {
+				this.recordingBackup = { ts:note.ts, sheetText:$sheetText.val() };
+				delete this.isNewRecordingSession;
+			}
+
+			$sheetText.val(gameSheet.toString());
+
+			// if there are no notes yet, the first one will automatically be placed at initialDelay
+			// similar problem happens when inserting note before the first one
+			// either way, we must reposition ourselves
+			if (note.ts != snapTs)
+				this.ts = note.ts;
+		}
+	}
+
+	undoRecording() {
+		if (this.recordingBackup) {
+			$sheetText.val(this.recordingBackup.sheetText).change();
+			this.seek(this.recordingBackup.ts - 1000);
+			delete this.recordingBackup;
 		}
 	}
 }
@@ -951,6 +1056,21 @@ function readFileAs(file, asType) {
 		else
 			reject("readFileAs: type must be 'dataURL' or 'text' or 'arrayBuffer'");
 	});
+}
+
+function downloadObjectURL(url, fileName) {
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = fileName;
+	document.body.appendChild(link);
+	link.click();
+	setTimeout(() => link.remove(), 1);
+}
+
+function downloadBlob(blob, fileName) {
+	const url = URL.createObjectURL(blob);
+	downloadObjectURL(url, fileName);
+	setTimeout(() => URL.revokeObjectURL(url), 1);
 }
 
 function commonErrorHandler(err) {

@@ -461,7 +461,7 @@ class Note {
 	}
 
 	getColor() {
-		return [false,'yellow'][this.group] || 'white';
+		return [false,'yellow','orange'][this.group] || 'white';
 	}
 
 	toString() {

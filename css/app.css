@@ -8,6 +8,7 @@ body {
 	flex-direction: column;
 	color: #fff;
 	overflow: hidden;
+	padding: 0!important;
 }
 
 .topbar {

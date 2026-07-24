@@ -4,6 +4,7 @@
 //============================================================
 
 let $piano;
+let pianoCanvas;
 
 let kbBindings = {};
 let modifier = "regul";	// regul | lower | upper
@@ -32,6 +33,7 @@ let backgrounds = [
 $(document).ready(() => {
 
 	$piano = $('.piano');
+	pianoCanvas = $piano.find('canvas')[0];
 
 	$piano.find('.key').each((i,elem) => {
 		let name = $(elem).data('code');
@@ -119,6 +121,9 @@ $(document).ready(() => {
 	updateShowBinds(modifier);
 
 	$(window).on('keydown', (event) => {
+		if (shouldIgnoreKeybind(event))
+			return;
+
 		if (!event.originalEvent.repeat) {
 			let bind = modifier+"-"+event.originalEvent.code;
 			if (kbBindings[bind])
@@ -142,6 +147,10 @@ $(document).ready(() => {
 	toggleBackground($('.cb-bg').is(':checked'));
 
 });
+
+function shouldIgnoreKeybind(event) {
+	return (event.target.nodeName == 'INPUT') || (event.target.nodeName == 'TEXTAREA');
+}
 
 function resolveAudioUri(key) {
 	return "audio/"+key+".mp3";
@@ -210,12 +219,14 @@ function toggleBackground(enable) {
 //@DONE: [FEATURE] new hint style where only the next incoming note/chord is lit up (and maybe the one after semi-lit as well)
 //@DONE: [QOL] auto save settings
 //@DONE: [FEATURE] recording mode - with timer resolution & multipass recording
-
-//@TODO: [QOL] edit notes on the gamesheet with right click -> contextmenu (assign group, move, batch move, delete)
+//@DONE: [QOL] edit notes on the gamesheet with right click -> contextmenu (assign group, move, batch move, delete)
 
 //@TODO: [QOL] some settings should be specifiable in sheet file (speed, shift)
 
 let $sheetText;
+
+let $gameSheet;
+let sheetCanvas;
 
 let gameSettings;
 let gameSheet;
@@ -227,6 +238,9 @@ $(document).ready(() => {
 		validateFn: (type) => type.startsWith('text/'),
 		callbackFn: (event, file) => onFile(file),
 	});
+
+	$gameSheet = $('.gamesheet');
+	sheetCanvas = $gameSheet.find('canvas')[0];
 
 	// Generate sheet columns
 	{
@@ -241,28 +255,28 @@ $(document).ready(() => {
 	}
 
 	// Setup track slider
-	{
-		$('.gametrack').on('mousedown', function(event) {
+	$('.gametrack').on('mousedown', function(event) {
+		event.preventDefault();
+		const bar = $(this).find('.bar');
+		const cursor = $(this).find('.cursor');
+		function mousemove(event) {
 			event.preventDefault();
-			const bar = $(this).find('.bar');
-			const cursor = $(this).find('.cursor');
-			function mousemove(event) {
-				event.preventDefault();
-				let f = clamp((event.clientX - bar.offset().left) / bar.width(), 0, 1);
-				gameState.seek(f * gameSheet.lastTs);
-			}
-			gameState.pause();
-			mousemove(event);
-			$(window).on('mousemove', mousemove);
-			$(window).one('mouseup', function(event) {
-				event.preventDefault();
-				$(window).off('mousemove', mousemove);
-			});
+			let f = clamp((event.clientX - bar.offset().left) / bar.width(), 0, 1);
+			gameState.seek(f * gameSheet.lastTs);
+		}
+		gameState.pause();
+		mousemove(event);
+		$(window).on('mousemove', mousemove);
+		$(window).one('mouseup', function(event) {
+			event.preventDefault();
+			$(window).off('mousemove', mousemove);
 		});
-	}
+	});
 
 	// Keybinds
 	$(window).on('keydown', function(event) {
+		if (shouldIgnoreKeybind(event))
+			return;
 		switch (event.originalEvent.code) {
 			case 'Space': gameState.togglePlay(); return false;
 			case 'ArrowLeft': gameState.seek(gameState.ts-2000); return false;
@@ -272,16 +286,15 @@ $(document).ready(() => {
 		return true;
 	});
 
-	// Avoid processing binds when in settings pane
-	$('.gamesettings').on('keydown mousewheel', function(event) {
-		event.stopPropagation();
-	});
-
+	// Observe sheet textarea
 	$sheetText = $('.gamesettings textarea');
 	$sheetText.on('change', function() {
 		gameSheet = GameSheet.createFromText(this.value);
+		updateGamingMode();
 		gameState.reset();
 	});
+
+	setupSheetEditing();
 
 	gameSettings = new GameSettings();
 	gameSheet = new GameSheet();
@@ -314,6 +327,72 @@ function onFile(file) {
 	readFileAs(file, 'text')
 	.then(text => $sheetText.val(text).change())
 	.catch(commonErrorHandler);
+}
+
+function setupSheetEditing() {
+	$gameSheet.setupContextMenu(event => {
+		if (gameState.playing || !gameSheet.renderCache)
+			return;
+
+		let relX = event.clientX - $(sheetCanvas).offset().left;
+		let relY = event.clientY - $(sheetCanvas).offset().top;
+		for (let item of gameSheet.renderCache) {
+			if (Math.pow(item.posX-relX,2)+Math.pow(item.posY-relY,2) < Math.pow(SHEET_NOTE_RAD,2)) {
+				event.noteUnderCursor = item.note;
+				let $menu = $('#cmenu-editnote');
+				$menu.find('.assignGroup').removeClass('d-none').filter('[data-group="'+item.note.group+'"]').addClass('d-none');
+				return $menu;
+			}
+		}
+	}, ($action, initialEvent) => {
+		if ($action.hasClass('assignGroup')) {
+			initialEvent.noteUnderCursor.group = parseInt($action.data('group'));
+			$sheetText.val(gameSheet.toString());
+			gameState.renderSheet();
+		}
+		else if ($action.hasClass('moveSingle')) {
+			bootbox.prompt({
+				size: 'small',
+				title: "Move Single",
+				message: "<p>This note timestamp : " + initialEvent.noteUnderCursor.ts + "<br>Move by :</p>",
+				inputType: 'number',
+				callback: (value) => {
+					value = parseInt(value);
+					if (value) {
+						initialEvent.noteUnderCursor.ts += value;
+						gameSheet.finalize();
+						$sheetText.val(gameSheet.toString());
+						gameState.renderSheet();
+					}
+				},
+			});
+		}
+		else if ($action.hasClass('moveBatch')) {
+			bootbox.prompt({
+				title: "Batch Move",
+				message: "<p>This note timestamp : " + initialEvent.noteUnderCursor.ts + "</p><p>Move this note <u>and all subsequent notes</u> by :</p>",
+				inputType: 'number',
+				callback: (value) => {
+					value = parseInt(value);
+					if (value) {
+						gameSheet.iterateNotesInRange(initialEvent.noteUnderCursor.ts, gameSheet.lastTs, (note) => {
+							note.ts += value;
+						});
+						gameSheet.finalize();
+						$sheetText.val(gameSheet.toString());
+						gameState.renderSheet();
+					}
+				},
+			});
+		}
+		else if ($action.hasClass('remove')) {
+			let i = gameSheet.indexOf(initialEvent.noteUnderCursor);
+			gameSheet.splice(i,1);
+			gameSheet.finalize();
+			$sheetText.val(gameSheet.toString());
+			gameState.renderSheet();
+		}
+	});
 }
 
 /**
@@ -351,6 +430,8 @@ function onFile(file) {
 
 const CHR_LOWER = '⌄';	//U+2304
 const CHR_UPPER = '⌃';	//U+2303
+
+const SHEET_NOTE_RAD = 14;
 
 class Note {
 	constructor(timestamp, code, group) {
@@ -392,6 +473,7 @@ class Note {
 class GameSheet extends Array {
 	constructor() {
 		super();
+		//WARNING: avoid code here as much as possible, Array will generate copies when calling functions like splice
 		this.finalize();
 	}
 
@@ -498,7 +580,7 @@ class GameSheet extends Array {
 				group = note.group;
 			}
 
-			txt += " " + pad0(2, note.code);
+			txt += " " + pad0(2, note.originalCode);
 		}
 
 		return txt;
@@ -611,9 +693,6 @@ class GameSettings {
 class GameState {
 	constructor() {
 		this.$cursor = $('.gametrack .cursor');
-		this.$sheet = $('.gamesheet');
-		this.sheetCanvas = this.$sheet.find('canvas')[0];
-		this.pianoCanvas = $piano.find('canvas')[0];
 
 		$piano.on('hit', '.key', (event,code) => this.onHit(parseInt(code)));
 		this.waitingForNotes = [];
@@ -704,9 +783,9 @@ class GameState {
 	}
 
 	renderSheet() {
-		const canvas = this.sheetCanvas;
-		canvas.width = this.$sheet.width();
-		canvas.height = this.$sheet.height();
+		const canvas = sheetCanvas;
+		canvas.width = $gameSheet.width();
+		canvas.height = $gameSheet.height();
 
 		const ctx = canvas.getContext('2d');
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -729,12 +808,13 @@ class GameState {
 		if (!gameSheet.length)
 			return;
 
-		const columnsPosX = this.$sheet.find('.col').map((i, elem) => (elem.offsetLeft-canvas.offsetLeft)+elem.offsetWidth/2);
+		const columnsPosX = $gameSheet.find('.col').map((i, elem) => (elem.offsetLeft-canvas.offsetLeft)+elem.offsetWidth/2);
 
 		ctx.font = 'bold 15px Helvetica';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		const NOTE_SIZE = 28;
+
+		gameSheet.renderCache = [];
 
 		gameSheet.iterateNotesInRange(this.ts, this.ts + gameSettings.sheetVisibleLength, (note) => {
 			let posX = columnsPosX[note.column];
@@ -742,16 +822,18 @@ class GameState {
 
 			ctx.fillStyle = note.getColor();
 			ctx.beginPath();
-			ctx.arc(posX, posY, NOTE_SIZE/2, NOTE_SIZE/2, 0, 2*Math.PI);
+			ctx.arc(posX, posY, SHEET_NOTE_RAD, SHEET_NOTE_RAD, 0, 2*Math.PI);
 			ctx.fill();
 
 			ctx.fillStyle = 'black';
 			ctx.fillText(note.label, posX, posY+1);
+
+			gameSheet.renderCache.push({ note, posX, posY });
 		});
 	}
 
 	renderNoteHints() {
-		const canvas = this.pianoCanvas;
+		const canvas = pianoCanvas;
 		canvas.width = $piano.width();
 		canvas.height = $piano.outerHeight();
 
@@ -881,7 +963,7 @@ class GameState {
 		else if (gameSettings.playMode == 'record' && this.playing) {
 			let snapTs = Math.round(this.ts / gameSettings.recordingResolution) * gameSettings.recordingResolution;
 
-			let note = new Note(snapTs, code, 0);
+			let note = new Note(snapTs, code-gameSettings.shift, 0);
 			gameSheet.push(note);
 			gameSheet.finalize();	//careful: this can modify note.ts
 
@@ -910,26 +992,6 @@ class GameState {
 		}
 	}
 }
-
-// Array of array of elements, first row is always the next one being deleted, process once per second
-const noteHintsToDelete = [];
-
-function registerNoteHintForDeletion($elem, duration) {
-	let index = Math.ceil(duration/1000);
-	while (noteHintsToDelete.length <= index)
-		noteHintsToDelete.push([]);
-	noteHintsToDelete[index].push($elem);
-}
-
-function deleteNoteHints() {
-	if (noteHintsToDelete.length) {
-		for (let $elem of noteHintsToDelete[0])
-			$elem.remove();
-		noteHintsToDelete.shift();
-	}
-}
-
-setInterval(deleteNoteHints, 1000);
 
 
 //============================================================
@@ -984,6 +1046,49 @@ $.fn.toggleClassHelper = function(b, classTrue, classFalse, bFindInChildren) {
 	return this;
 }
 
+function readFileAs(file, asType) {
+	return new Promise((resolve, reject) => {
+		if (!file)
+			return reject("readFileAs: no file");
+
+		const reader = new FileReader();
+		reader.onload = function(event) {
+			if (event.target.readyState == FileReader.DONE)
+				resolve(event.target.result);
+			else
+				console.log("readyState?!", event.target.readyState);
+		};
+		reader.onerror = reject;
+		if (asType == 'dataURL')
+			reader.readAsDataURL(file);
+		else if (asType == 'text')
+			reader.readAsText(file);
+		else if (asType == 'arrayBuffer')
+			reader.readAsArrayBuffer(file);
+		else
+			reject("readFileAs: type must be 'dataURL' or 'text' or 'arrayBuffer'");
+	});
+}
+
+function downloadObjectURL(url, fileName) {
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = fileName;
+	document.body.appendChild(link);
+	link.click();
+	setTimeout(() => link.remove(), 1);
+}
+
+function downloadBlob(blob, fileName) {
+	const url = URL.createObjectURL(blob);
+	downloadObjectURL(url, fileName);
+	setTimeout(() => URL.revokeObjectURL(url), 1);
+}
+
+//================================================
+// Drag & Drop
+//================================================
+
 $.fn.setupDragDrop = function(subSelector, options) {
 	if (options === undefined) {
 		options = subSelector;
@@ -1034,44 +1139,77 @@ $.fn.setupDragDrop = function(subSelector, options) {
 	});
 }
 
-function readFileAs(file, asType) {
-	return new Promise((resolve, reject) => {
-		if (!file)
-			return reject("readFileAs: no file");
+//================================================
+// Context Menu
+//================================================
 
-		const reader = new FileReader();
-		reader.onload = function(event) {
-			if (event.target.readyState == FileReader.DONE)
-				resolve(event.target.result);
-			else
-				console.log("readyState?!", event.target.readyState);
-		};
-		reader.onerror = reject;
-		if (asType == 'dataURL')
-			reader.readAsDataURL(file);
-		else if (asType == 'text')
-			reader.readAsText(file);
-		else if (asType == 'arrayBuffer')
-			reader.readAsArrayBuffer(file);
-		else
-			reject("readFileAs: type must be 'dataURL' or 'text' or 'arrayBuffer'");
+$.fn.setupContextMenu = function(subSelector, menuResolver, actionCallback) {
+	if (actionCallback === undefined) {
+		actionCallback = menuResolver;
+		menuResolver = subSelector;
+		subSelector = undefined;
+	}
+	if (!menuResolver)
+		throw new Error("setupContextMenu: menuResolver required");
+	if (!actionCallback)
+		throw new Error("setupContextMenu: actionCallback required");
+
+	return this.off('contextmenu', subSelector).on('contextmenu', subSelector, function(event) {
+		if (event.ctrlKey)
+			return;	// Ctrl + right click allow default context menu
+
+		return !$(this).openContextMenu(event, menuResolver, event.clientX, event.clientY, actionCallback);
 	});
+};
+
+$.fn.openContextMenu = function(contextMenuEvent, menuResolver, x, y, actionCallback) {
+	closeContextMenu();
+
+	if (!menuResolver)
+		throw new Error("openContextMenu: menuResolver required");
+	if (!actionCallback)
+		throw new Error("openContextMenu: actionCallback required");
+
+	let $elem = this;
+
+	let $menu = (typeof(menuResolver) == 'function') ? menuResolver.call($elem, contextMenuEvent) : $(menuResolver);
+	if (!$menu || $menu.length == 0)
+		return false;
+
+	$menu.show()
+		.css({
+			position: 'absolute',
+			left: __cmenu_getPos($menu, x, 'width', 'scrollLeft'),
+			top : __cmenu_getPos($menu, y, 'height', 'scrollTop'),
+			zIndex: 1080,	//draw over bootstrap tooltips
+		})
+		.off('click')
+		.on('click', 'a,button', function(event) {
+			event.preventDefault();
+			closeContextMenu();
+			actionCallback.call(/*initial target*/$elem, /*menu button*/$(this), contextMenuEvent);
+		});
+
+	setTimeout(() => $('body').one('click', closeContextMenu), 1);
+	return true;
 }
 
-function downloadObjectURL(url, fileName) {
-	const link = document.createElement('a');
-	link.href = url;
-	link.download = fileName;
-	document.body.appendChild(link);
-	link.click();
-	setTimeout(() => link.remove(), 1);
+function closeContextMenu() {
+	$('body').off('click', closeContextMenu);
+	$('.dropdown-menu:visible').hide().trigger('cmenu.dismiss');
 }
 
-function downloadBlob(blob, fileName) {
-	const url = URL.createObjectURL(blob);
-	downloadObjectURL(url, fileName);
-	setTimeout(() => URL.revokeObjectURL(url), 1);
+function __cmenu_getPos(menu, mousePos, sizeFunc, scrollFunc) {
+	let menuSize = menu[sizeFunc]();
+	if (mousePos + menuSize > $(window)[sizeFunc]() && menuSize < mousePos)
+		return $(window)[scrollFunc]() + mousePos - menuSize;
+	else
+		return $(window)[scrollFunc]() + mousePos;
 }
+
+//================================================
+// Error Handling
+//================================================
 
 function commonErrorHandler(err) {
 	console.error(err);

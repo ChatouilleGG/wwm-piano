@@ -14,6 +14,7 @@ body {
 .topbar {
 	z-index: 200;
 	border-bottom: 1px solid #445;
+	box-shadow: 0 0 4px -1px black;
 	padding: 0 1em;
 	> * { padding: 0.5rem 0; }
 
@@ -31,7 +32,6 @@ body {
 
 .inner {
 	flex-grow: 1;
-	box-shadow: inset 0 0 4px -1px black;
 	background: #678;
 	color: #fff;
 	display: flex;
@@ -170,7 +170,7 @@ body:not(.gaming) .gaming { display: none!important; }
 			align-items: center;
 			justify-content: center;
 			outline: none;
-			transition: 400ms;
+			transition: 400ms, visibility 0ms;
 			&.trigger {
 				color: #0f0;
 				box-shadow: 0 0 0.6em 0.25em currentColor, inset 0 0 1.6em 0px currentColor;
@@ -214,6 +214,29 @@ body:not(.gaming) .gaming { display: none!important; }
 	}
 }
 
+body.inst-drum {
+	.piano {
+		.pianorow:not(:nth-child(2)) { display: none; }
+		.key { visibility: collapse; }
+		.key[data-code="13"] { visibility: visible; }
+		.key[data-code="15"] { visibility: visible; }
+		.key[data-code="17"] { visibility: visible; }
+		.key[data-code="18"] { visibility: visible; }
+		.key[data-code="20"] { visibility: visible; }
+		.key[data-code="22"] { visibility: visible; }
+		.key[data-code="24"] { visibility: visible; }
+	}
+	.gamesheet {
+		.range:nth-child(2) { visibility: collapse; }
+		.range:nth-child(4) { visibility: collapse; }
+		.range:nth-child(7) { visibility: collapse; }
+		.range:nth-child(9) { visibility: collapse; }
+		.range:nth-child(11) { visibility: collapse; }
+		.col:nth-child(1) { visibility: collapse; }
+		.col:nth-child(3) { visibility: collapse; }
+	}
+}
+
 .bottom-section {
 	flex-grow: 1;
 	body.gaming & { flex-grow: 0; }
@@ -254,6 +277,37 @@ body:not(.gaming) .gaming { display: none!important; }
 				border-radius: 2em;
 			}
 		}
+	}
+}
+
+.instruments {
+	position: absolute;
+	left: 0;
+	top: 4em;
+	color: #0ffc;
+	display: flex;
+	flex-direction: column;
+
+	button {
+		padding: 0.2em;
+		border: 2px solid transparent;
+		background-origin: border-box!important;
+		border-left: 0;
+		border-radius: 0 0.4em 0.4em 0;
+		color: #888;
+		background: linear-gradient(to bottom, #111 0%, #444 100%);
+		outline: none;
+		transition: 200ms;
+
+		img {
+			width: 2.8em;
+			height: 2.8em;
+			object-fit: contain;
+		}
+	}
+	button.active {
+		border-color: #fc0;
+		background: linear-gradient(to bottom, #321 0%, #752 100%);
 	}
 }
 

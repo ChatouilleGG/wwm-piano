@@ -9,12 +9,17 @@ let pianoCanvas;
 let kbBindings = {};
 let modifier = "regul";	// regul | lower | upper
 
+let instrument = 'piano';	// piano | drum
+
 class PianoKey {
-	constructor($, name, audio) {
+	constructor($, name) {
 		this.$ = $;
 		this.name = name;
 		this.code = parseInt(name);
-		this.audio = audio;
+		this.audios = {
+			piano: null,
+			drum: null,
+		};
 	}
 }
 // map key name to PianoKey object
@@ -35,9 +40,11 @@ $(document).ready(() => {
 	$piano = $('.piano');
 	pianoCanvas = $piano.find('canvas')[0];
 
+	setInstrument(instrument);
+
 	$piano.find('.key').each((i,elem) => {
-		let name = $(elem).data('code');
-		pianoMap[name] = new PianoKey($(elem), name, null);
+		let name = $(elem).attr('data-code');
+		pianoMap[name] = new PianoKey($(elem), name);
 
 		let bind = $(elem).data('bind');
 		kbBindings[bind] = elem;
@@ -47,8 +54,12 @@ $(document).ready(() => {
 	if (window.location.href.startsWith('file://')) {
 
 		// Load individual sound files
-		for (let key of Object.values(pianoMap))
-			key.audio = new Audio(resolveAudioUri(key.name));
+		for (let key of Object.values(pianoMap)) {
+			key.audios.piano = new Audio(resolveAudioUri('piano', key.name));
+
+			if (['13','15','17','18','20','22','24'].indexOf(key.name) != -1)
+				key.audios.drum = new Audio(resolveAudioUri('drum', key.name));
+		}
 
 	}
 	else {
@@ -83,11 +94,16 @@ $(document).ready(() => {
 
 				// 2. for each element
 				for (let i=0; i<numSounds; i++) {
-					// 2.1. sound name
+					
+					// 2.1. instrument
+					let type = buf.readShortString();
+					console.log("type", type);
+
+					// 2.2. key name
 					let name = buf.readShortString();
 					console.log("fileName", name);
 
-					// 2.2. audio data (as arraybuffer)
+					// 2.3. audio data (as arraybuffer)
 					let data = buf.readArrayBuffer();
 					console.log("data", data);
 
@@ -97,7 +113,7 @@ $(document).ready(() => {
 						let url = URL.createObjectURL(blob);
 
 						// Bind it
-						pianoMap[name].audio = new Audio(url);
+						pianoMap[name].audios[type] = new Audio(url);
 					}
 				}
 			}
@@ -148,12 +164,19 @@ $(document).ready(() => {
 
 });
 
+function setInstrument(inst) {
+	$('body').removeClass('inst-'+instrument);
+	instrument = inst;
+	$('body').addClass('inst-'+instrument);
+	$('.instruments > *').removeClass('active').filter('.'+instrument).addClass('active');
+}
+
 function shouldIgnoreKeybind(event) {
 	return (event.target.nodeName == 'INPUT') || (event.target.nodeName == 'TEXTAREA');
 }
 
-function resolveAudioUri(key) {
-	return "audio/"+key+".mp3";
+function resolveAudioUri(type, key) {
+	return "audio/"+type+"/"+key+".mp3";
 }
 
 let showingBinds;
@@ -170,9 +193,14 @@ function triggerKey() {
 	//console.log(this);
 
 	let keyName = $(this).data('code');
-	let sound = pianoMap[keyName].audio.cloneNode();
-	sound.volume = volume/100;
-	sound.play();
+
+	let soundNode = pianoMap[keyName].audios[instrument];
+	if (!soundNode)
+		return;
+
+	soundNode = soundNode.cloneNode();
+	soundNode.volume = volume/100;
+	soundNode.play();
 
 	$(this).addClass('trigger').trigger('hit', [keyName]);
 
@@ -221,7 +249,7 @@ function toggleBackground(enable) {
 //@DONE: [FEATURE] recording mode - with timer resolution & multipass recording
 //@DONE: [QOL] edit notes on the gamesheet with right click -> contextmenu (assign group, move, batch move, delete)
 
-//@TODO: [QOL] some settings should be specifiable in sheet file (speed, shift)
+//@TODO: [QOL] some settings should be specifiable in sheet file (speed, shift, instrument)
 
 let $sheetText;
 

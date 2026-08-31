@@ -4,16 +4,19 @@ const path = require('path');
 const fs = require('fs');
 
 let outPath;
-let inPaths = [];
+let inputs = [];
+let type = "";
 
 for (let i=2; i<process.argv.length; i++) {
 	if (i==2)
 		outPath = path.resolve(process.argv[i]);
+	else if (process.argv[i].startsWith('--type='))
+		type = process.argv[i].substr(7);
 	else
-		inPaths.push(path.resolve(process.argv[i]));
+		inputs.push({ path:path.resolve(process.argv[i]), type });
 }
 
-if (!outPath || !inPaths.length) {
+if (!outPath || !inputs.length) {
 	console.error("Usage: node pack_sounds.js <outputFile> <inputFile1> [inputFile2 ...]");
 	return process.exit(1);
 }
@@ -38,18 +41,21 @@ outStream.writeBuffer = function(buf) {
 }
 
 // 1. int32 number of files
-outStream.writeUInt32(inPaths.length);
+outStream.writeUInt32(inputs.length);
 
 // 2. for each file
-for (let inPath of inPaths) {
-	console.log("Adding", inPath);
+for (let input of inputs) {
+	console.log("Adding", input);
 
-	// 2.1. file name (no path no extension)
-	outStream.writeShortString(path.basename(inPath, path.extname(inPath)));
+	// 2.1. type
+	outStream.writeShortString(input.type);
+
+	// 2.2. name
+	outStream.writeShortString(path.basename(input.path, path.extname(input.path)));
 
 	let fileBuf;
 	try {
-		fileBuf = fs.readFileSync(inPath);
+		fileBuf = fs.readFileSync(input.path);
 	}
 	catch(err) {
 		console.warn(err);
@@ -57,7 +63,7 @@ for (let inPath of inPaths) {
 		continue;
 	}
 
-	// 2.2. file contents
+	// 2.3. file contents
 	outStream.writeBuffer(fileBuf);
 }
 
